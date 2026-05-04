@@ -1,0 +1,662 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Admin Dashboard - Deli Burrito</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;900&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Outfit', sans-serif; }
+    .nav-active { @apply bg-white/20 border-r-4 border-yellow-400; }
+    .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+    .custom-scrollbar::-webkit-scrollbar-track { background: #f1f1f1; }
+    .custom-scrollbar::-webkit-scrollbar-thumb { background: #dc2626; border-radius: 10px; }
+  </style>
+</head>
+<body class="bg-gray-50 min-h-screen text-gray-800">
+  <div id="app" class="flex min-h-screen">
+    
+    <!-- Sidebar -->
+    <aside class="w-72 bg-red-800 text-white flex-shrink-0 flex flex-col sticky top-0 h-screen shadow-2xl z-40">
+      <div class="p-8 border-b border-white/10">
+        <h1 class="text-3xl font-black tracking-tighter">DELI<span class="text-yellow-300">BURRITO</span></h1>
+        <p class="text-xs text-red-200 mt-1 uppercase font-bold tracking-widest">Admin Control Center</p>
+      </div>
+
+      <nav class="flex-1 p-4 space-y-2 overflow-y-auto custom-scrollbar">
+        <button data-view="orders" class="nav-btn w-full flex items-center gap-3 px-6 py-4 rounded-2xl transition-all hover:bg-white/10 font-bold">
+          <span class="text-xl">📦</span> Pedidos
+        </button>
+        <button data-view="categories" class="nav-btn w-full flex items-center gap-3 px-6 py-4 rounded-2xl transition-all hover:bg-white/10 font-bold">
+          <span class="text-xl">🗂️</span> Categorías
+        </button>
+        <button data-view="options" class="nav-btn w-full flex items-center gap-3 px-6 py-4 rounded-2xl transition-all hover:bg-white/10 font-bold">
+          <span class="text-xl">🍕</span> Opciones / Precios
+        </button>
+        <button data-view="settings" class="nav-btn w-full flex items-center gap-3 px-6 py-4 rounded-2xl transition-all hover:bg-white/10 font-bold">
+          <span class="text-xl">⚙️</span> Ajustes
+        </button>
+      </nav>
+
+      <div class="p-6 bg-red-900/50 border-t border-white/10">
+        <button id="logoutBtn" class="w-full py-3 bg-yellow-400 hover:bg-yellow-300 text-red-900 rounded-xl font-black text-sm transition-all shadow-lg transform active:scale-95">
+          CERRAR SESIÓN
+        </button>
+      </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="flex-1 flex flex-col min-w-0 overflow-hidden">
+      
+      <!-- Top Bar -->
+      <header class="h-20 bg-white border-b px-8 flex items-center justify-between shadow-sm sticky top-0 z-30">
+        <h2 id="viewTitle" class="text-2xl font-black text-gray-800 uppercase tracking-tight">Cargando...</h2>
+        <div class="flex items-center gap-4">
+            <span id="updateTimer" class="text-xs text-gray-400 font-mono bg-gray-100 px-3 py-1 rounded-full">Actualizado hace: 0s</span>
+            <button id="refreshBtn" class="bg-red-50 text-red-600 p-2 rounded-xl hover:bg-red-100 transition-colors">🔄</button>
+        </div>
+      </header>
+
+      <!-- View Containers -->
+      <div id="viewContainer" class="flex-1 p-8 overflow-y-auto custom-scrollbar">
+        
+        <!-- View: Orders -->
+        <div id="view-orders" class="view-content">
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+            <div class="bg-white p-6 rounded-3xl shadow-sm border border-gray-100"><p class="text-xs font-black text-gray-400 uppercase mb-1">Hoy</p><p id="statsTotal" class="text-3xl font-black">0</p></div>
+            <div class="bg-white p-6 rounded-3xl shadow-sm border border-gray-100"><p class="text-xs font-black text-yellow-500 uppercase mb-1">Pendientes</p><p id="statsPending" class="text-3xl font-black">0</p></div>
+            <div class="bg-white p-6 rounded-3xl shadow-sm border border-gray-100"><p class="text-xs font-black text-green-500 uppercase mb-1">Aceptados</p><p id="statsAccepted" class="text-3xl font-black">0</p></div>
+            <div class="bg-white p-6 rounded-3xl shadow-sm border border-gray-100"><p class="text-xs font-black text-red-500 uppercase mb-1">Cancelados</p><p id="statsCancelled" class="text-3xl font-black">0</p></div>
+          </div>
+
+          <!-- TABS DE PEDIDOS -->
+          <div class="flex gap-2 mb-8 bg-gray-200/50 p-1.5 rounded-2xl w-fit">
+              <button onclick="setOrderTab('pendiente')" id="tab-pendiente" class="order-tab px-6 py-3 rounded-xl font-black text-[10px] uppercase transition-all">Nuevos / Pendientes</button>
+              <button onclick="setOrderTab('aceptado')" id="tab-aceptado" class="order-tab px-6 py-3 rounded-xl font-black text-[10px] uppercase transition-all">Confirmados</button>
+              <button onclick="setOrderTab('cancelado')" id="tab-cancelado" class="order-tab px-6 py-3 rounded-xl font-black text-[10px] uppercase transition-all">Historial / Cancelados</button>
+          </div>
+
+          <div id="ordersGrid" class="grid grid-cols-1 xl:grid-cols-2 gap-6"></div>
+        </div>
+
+        <!-- View: Categories -->
+        <div id="view-categories" class="view-content hidden">
+          <div class="flex justify-between items-center mb-8">
+            <div>
+              <h3 class="text-2xl font-black">Gestión de Categorías</h3>
+              <p class="text-gray-500">Configura los pasos del formulario (Proteínas, Salsas, etc.)</p>
+            </div>
+            <button onclick="openCategoryModal()" class="bg-red-600 text-white px-6 py-3 rounded-2xl font-black shadow-lg hover:bg-red-700 transition-all">+ NUEVA CATEGORÍA</button>
+          </div>
+          <div class="bg-white rounded-3xl shadow-sm border overflow-hidden">
+            <table class="w-full text-left border-collapse">
+              <thead class="bg-gray-50 text-xs font-black uppercase text-gray-400 tracking-widest">
+                <tr>
+                  <th class="px-6 py-4">Orden</th>
+                  <th class="px-6 py-4">Nombre</th>
+                  <th class="px-6 py-4">Tipo Producto</th>
+                  <th class="px-6 py-4">Estado</th>
+                  <th class="px-6 py-4 text-right">Acciones</th>
+                </tr>
+              </thead>
+              <tbody id="categoriesTableBody" class="divide-y divide-gray-100"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- View: Options -->
+        <div id="view-options" class="view-content hidden">
+          <div class="flex justify-between items-center mb-8">
+            <div>
+              <h3 class="text-2xl font-black">Opciones e Ingredientes</h3>
+              <p class="text-gray-500">Modifica precios y disponibilidad de cada ingrediente.</p>
+            </div>
+            <button onclick="openOptionModal()" class="bg-red-600 text-white px-6 py-3 rounded-2xl font-black shadow-lg hover:bg-red-700 transition-all">+ NUEVO INGREDIENTE</button>
+          </div>
+          <div id="optionsGroupedContainer" class="space-y-8">
+            <!-- Grouped tables will be injected here -->
+          </div>
+        </div>
+
+        <!-- View: Settings -->
+        <div id="view-settings" class="view-content hidden">
+            <div class="max-w-2xl bg-white p-8 rounded-3xl shadow-sm border border-gray-100">
+                <h3 class="text-2xl font-black mb-6 uppercase">Configuración Global</h3>
+                <div class="space-y-6">
+                    <div>
+                        <label class="block text-xs font-black text-gray-400 uppercase mb-2">Costo de Domicilio</label>
+                        <input type="number" id="costoDomicilioInput" class="w-full p-4 bg-gray-50 rounded-2xl border-2 border-transparent focus:border-red-600 outline-none transition-all font-bold text-lg">
+                    </div>
+                    <button onclick="saveSettings()" class="w-full py-4 bg-gray-900 text-white rounded-2xl font-black hover:bg-gray-800 transition-all shadow-xl">GUARDAR AJUSTES</button>
+                </div>
+            </div>
+        </div>
+
+      </div>
+    </main>
+  </div>
+
+  <!-- Modals -->
+  <div id="modalOverlay" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div id="modalContent" class="bg-white w-full max-w-lg rounded-3xl shadow-2xl overflow-y-auto p-8 max-h-[95vh] custom-scrollbar">
+        <!-- Content dynamic via JS -->
+    </div>
+  </div>
+
+  <!-- Custom Confirm Modal -->
+  <div id="confirmOverlay" class="fixed inset-0 bg-black/80 backdrop-blur-md z-[110] hidden flex items-center justify-center p-4">
+    <div class="bg-white w-full max-w-sm rounded-[2.5rem] shadow-2xl p-8 text-center border-4 border-yellow-400 animate-in zoom-in duration-300">
+        <div class="text-6xl mb-4">⚠️</div>
+        <h3 id="confirmTitle" class="text-2xl font-black uppercase tracking-tighter mb-2 text-gray-800">¿Estás seguro?</h3>
+        <p id="confirmMessage" class="text-gray-500 font-bold mb-8 leading-tight uppercase text-[10px] tracking-widest">Esta acción no se puede deshacer fácilmente.</p>
+        <div class="flex gap-4">
+            <button id="confirmCancel" class="flex-1 py-4 bg-gray-100 text-gray-400 rounded-2xl font-black hover:bg-gray-200 transition-all uppercase text-xs">Mejor no</button>
+            <button id="confirmYes" class="flex-1 py-4 bg-red-600 text-white rounded-2xl font-black shadow-lg hover:bg-red-700 transition-all uppercase text-xs">Sí, borrar</button>
+        </div>
+    </div>
+  </div>
+
+  <!-- Toast Notifications -->
+  <div id="toastContainer" class="fixed bottom-8 right-8 z-[100] flex flex-col gap-3 pointer-events-none"></div>
+
+  <script>
+    const apiBase = '';
+    let currentView = 'orders';
+    let currentOrderTab = 'pendiente';
+    let dataCache = { orders: [], categories: [], options: [] };
+    const money = (val) => new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(val);
+
+    window.showToast = (message, type = 'success') => {
+        const id = Date.now();
+        const container = document.getElementById('toastContainer');
+        const toast = document.createElement('div');
+        toast.className = `pointer-events-auto min-w-[300px] flex items-center gap-4 p-4 rounded-2xl shadow-2xl border bg-white animate-in slide-in-from-right duration-500 transition-all ${type === 'success' ? 'border-green-100 text-green-800' : 'border-red-100 text-red-800'}`;
+        toast.innerHTML = `
+            <span class="text-2xl">${type === 'success' ? '✅' : '❌'}</span>
+            <div>
+                <p class="font-black uppercase text-[10px] tracking-widest opacity-50">${type === 'success' ? 'Éxito' : 'Atención'}</p>
+                <p class="font-bold text-sm leading-tight">${message}</p>
+            </div>
+        `;
+        container.appendChild(toast);
+        setTimeout(() => {
+            toast.classList.add('opacity-0', 'translate-x-full');
+            setTimeout(() => toast.remove(), 500);
+        }, 3000);
+    };
+
+    window.showConfirm = (message, onConfirm) => {
+        const overlay = document.getElementById('confirmOverlay');
+        const msgEl = document.getElementById('confirmMessage');
+        const yesBtn = document.getElementById('confirmYes');
+        const noBtn = document.getElementById('confirmCancel');
+
+        msgEl.textContent = message;
+        overlay.classList.remove('hidden');
+
+        const cleanUp = () => {
+            overlay.classList.add('hidden');
+            yesBtn.onclick = null;
+            noBtn.onclick = null;
+        };
+
+        yesBtn.onclick = () => {
+            onConfirm();
+            cleanUp();
+        };
+        noBtn.onclick = cleanUp;
+    };
+
+    // Navigation
+    document.querySelectorAll('.nav-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        switchView(btn.dataset.view);
+      });
+    });
+
+    function setOrderTab(tab) {
+        currentOrderTab = tab;
+        document.querySelectorAll('.order-tab').forEach(el => {
+            el.classList.remove('bg-white', 'text-red-600', 'shadow-sm');
+            el.classList.add('text-gray-500', 'hover:text-gray-700');
+        });
+        const active = document.getElementById(`tab-${tab}`);
+        active.classList.remove('text-gray-500', 'hover:text-gray-700');
+        active.classList.add('bg-white', 'text-red-600', 'shadow-sm');
+        renderOrders();
+    }
+
+    function switchView(viewName) {
+      currentView = viewName;
+      document.querySelectorAll('.view-content').forEach(el => el.classList.add('hidden'));
+      document.getElementById(`view-${viewName}`).classList.remove('hidden');
+      
+      document.querySelectorAll('.nav-btn').forEach(btn => {
+        btn.classList.remove('bg-white/20', 'border-r-4', 'border-yellow-400');
+        if (btn.dataset.view === viewName) btn.classList.add('bg-white/20', 'border-r-4', 'border-yellow-400');
+      });
+
+      document.getElementById('viewTitle').textContent = viewName;
+      loadViewData();
+    }
+
+    async function loadViewData() {
+        const response = await fetch(`${apiBase}/index.php?route=${currentView === 'orders' ? 'orders' : currentView}`);
+        const data = await response.json();
+        
+        if (currentView === 'orders') {
+            dataCache.orders = data.orders || [];
+            renderOrders();
+            setOrderTab(currentOrderTab); // Refresh tab style
+        } else if (currentView === 'categories') {
+            dataCache.categories = data;
+            renderCategories();
+        } else if (currentView === 'options') {
+            dataCache.options = data;
+            renderOptions();
+        } else if (currentView === 'settings') {
+            const delivery = data.find(s => s.key === 'costo_domicilio');
+            if (delivery) {
+                document.getElementById('costoDomicilioInput').value = delivery.value;
+            }
+        }
+        lastUpdate = new Date();
+    }
+
+    // --- RENDERERS ---
+
+    function renderOrders() {
+        const grid = document.getElementById('ordersGrid');
+        const allOrders = dataCache.orders;
+        const filtered = allOrders.filter(o => o.status === currentOrderTab);
+        
+        document.getElementById('statsTotal').textContent = allOrders.length;
+        document.getElementById('statsPending').textContent = allOrders.filter(o => o.status === 'pendiente').length;
+        document.getElementById('statsAccepted').textContent = allOrders.filter(o => o.status === 'aceptado').length;
+        document.getElementById('statsCancelled').textContent = allOrders.filter(o => o.status === 'cancelado').length;
+
+        grid.innerHTML = filtered.map(order => `
+            <article onclick="viewOrderDetail(${order.id})" class="bg-white rounded-3xl shadow-sm border border-gray-100 p-6 hover:shadow-xl transition-all cursor-pointer group animate-in fade-in duration-500">
+                <div class="flex justify-between items-start mb-4">
+                    <div>
+                        <div class="text-[10px] font-black text-gray-400 uppercase tracking-widest">Pedido #${order.id}</div>
+                        <h4 class="text-xl font-black text-gray-800 group-hover:text-red-600 transition-colors">${order.customer_name}</h4>
+                        <p class="text-xs text-gray-500 font-bold">${order.customer_phone || 'N/A'} · ${order.delivery_type.toUpperCase()}</p>
+                    </div>
+                    <span class="px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wider ${
+                        order.status === 'pendiente' ? 'bg-yellow-100 text-yellow-700' :
+                        order.status === 'aceptado' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+                    }">${order.status}</span>
+                </div>
+                
+                <div class="bg-gray-50 rounded-2xl p-4 mb-4">
+                    ${order.items.map(item => `
+                        <div class="flex justify-between items-center py-1 border-b last:border-0 border-gray-200">
+                            <span class="text-xs font-black text-gray-700 uppercase">${item.product_type}</span>
+                            <span class="text-[10px] text-gray-400 font-bold italic">${item.options.length} ingred.</span>
+                        </div>
+                    `).join('')}
+                </div>
+
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-[10px] font-black text-gray-400 uppercase">Total</p>
+                        <p class="text-2xl font-black text-red-600 tracking-tighter">${money(order.total)}</p>
+                    </div>
+                    <div class="flex gap-2">
+                        ${order.status === 'pendiente' ? `
+                            <button onclick="event.stopPropagation(); updateOrderStatus(${order.id}, 'aceptado')" class="p-3 bg-green-500 text-white rounded-xl hover:bg-green-600 transition-colors shadow-lg" title="Aceptar">✓</button>
+                            <button onclick="event.stopPropagation(); updateOrderStatus(${order.id}, 'cancelado')" class="p-3 bg-red-100 text-red-600 rounded-xl hover:bg-red-200 transition-colors" title="Cancelar">✕</button>
+                        ` : ''}
+                        <button onclick="event.stopPropagation(); window.open('${apiBase}/index.php?route=orders/${order.id}/print')" class="p-3 bg-slate-800 text-white rounded-xl hover:bg-slate-900 transition-colors shadow-lg" title="Imprimir">🖨️</button>
+                    </div>
+                </div>
+            </article>
+        `).join('') || `
+            <div class="col-span-full py-20 text-center">
+                <div class="text-4xl mb-4">💨</div>
+                <p class="text-gray-400 font-black uppercase text-xs tracking-widest">No hay pedidos en esta sección</p>
+            </div>
+        `;
+    }
+
+    function renderCategories() {
+        const body = document.getElementById('categoriesTableBody');
+        body.innerHTML = dataCache.categories.map(cat => `
+            <tr class="hover:bg-gray-50 transition-colors">
+                <td class="px-6 py-4 font-black text-gray-400">#${cat.order_index}</td>
+                <td class="px-6 py-4 font-bold text-gray-800">${cat.name}</td>
+                <td class="px-6 py-4"><span class="px-3 py-1 bg-gray-100 rounded-lg text-xs font-bold uppercase">${cat.product_type}</span></td>
+                <td class="px-6 py-4">
+                    <span class="px-3 py-1 ${Number(cat.is_active) === 1 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'} rounded-lg text-[10px] font-black uppercase">
+                        ${Number(cat.is_active) === 1 ? 'Activo' : 'Inactivo'}
+                    </span>
+                </td>
+                <td class="px-6 py-4 text-right space-x-2">
+                    <button onclick='editCategory(${JSON.stringify(cat).replace(/'/g, "&apos;")})' class="text-blue-600 hover:underline font-bold text-[10px] uppercase">Editar</button>
+                    <button onclick="deleteCategory(${cat.id})" class="text-red-600 hover:underline font-bold text-[10px] uppercase">Eliminar</button>
+                </td>
+            </tr>
+        `).join('');
+    }
+
+    function renderOptions() {
+        const container = document.getElementById('optionsGroupedContainer');
+        const options = dataCache.options;
+        
+        // Group by category
+        const grouped = options.reduce((acc, opt) => {
+            if (!acc[opt.category_name]) acc[opt.category_name] = [];
+            acc[opt.category_name].push(opt);
+            return acc;
+        }, {});
+
+        container.innerHTML = Object.entries(grouped).map(([catName, items]) => `
+            <div class="bg-white rounded-3xl shadow-sm border overflow-hidden">
+                <div class="bg-gray-100 px-6 py-3 border-b">
+                    <h4 class="text-xs font-black uppercase tracking-widest text-gray-500">${catName}</h4>
+                </div>
+                <table class="w-full text-left border-collapse">
+                    <thead class="bg-gray-50 text-[10px] font-black uppercase text-gray-400 tracking-widest border-b">
+                        <tr>
+                            <th class="px-6 py-3">Ingrediente</th>
+                            <th class="px-6 py-3">Precio Base</th>
+                            <th class="px-6 py-3">Precio Extra</th>
+                            <th class="px-6 py-3 text-center">Estado</th>
+                            <th class="px-6 py-3 text-right">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-100">
+                        ${items.map(opt => `
+                            <tr class="hover:bg-gray-50 transition-colors">
+                                <td class="px-6 py-4 font-bold text-gray-800">${opt.name}</td>
+                                <td class="px-6 py-4 font-black text-red-600">${money(opt.price_base)}</td>
+                                <td class="px-6 py-4 font-black text-green-600">+${money(opt.price_extra)}</td>
+                                <td class="px-6 py-4 text-center">
+                                    <span class="px-3 py-1 ${Number(opt.is_active) === 1 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'} rounded-lg text-[10px] font-black uppercase">
+                                        ${Number(opt.is_active) === 1 ? 'Activo' : 'Inactivo'}
+                                    </span>
+                                </td>
+                                <td class="px-6 py-4 text-right space-x-2">
+                                    <button onclick='editOption(${JSON.stringify(opt).replace(/'/g, "&apos;")})' class="text-blue-600 hover:underline font-bold text-[10px] uppercase">Editar</button>
+                                    <button onclick="deleteOption(${opt.id})" class="text-red-600 hover:underline font-bold text-[10px] uppercase">Eliminar</button>
+                                </td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            </div>
+        `).join('') || '<div class="py-20 text-center text-gray-400 font-bold">No hay ingredientes configurados.</div>';
+    }
+
+    // --- MODALS ---
+
+    function openCategoryModal(cat = null) {
+        const overlay = document.getElementById('modalOverlay');
+        const content = document.getElementById('modalContent');
+        content.className = "bg-white w-full max-w-lg rounded-3xl shadow-2xl overflow-y-auto p-8 max-h-[95vh] custom-scrollbar";
+        
+        content.innerHTML = `
+            <h3 class="text-2xl font-black mb-6 uppercase">${cat ? 'Editar Categoría' : 'Nueva Categoría'}</h3>
+            <form id="categoryForm" class="space-y-4">
+                <input type="hidden" name="id" value="${cat ? cat.id : ''}">
+                <div>
+                    <label class="block text-[10px] font-black text-gray-400 uppercase mb-1">Nombre de la sección</label>
+                    <input type="text" name="name" value="${cat ? cat.name : ''}" required class="w-full p-4 bg-gray-50 rounded-2xl border-2 border-transparent focus:border-red-600 outline-none font-bold">
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-[10px] font-black text-gray-400 uppercase mb-1">Max. Selecciones</label>
+                        <input type="number" name="max_selections" value="${cat ? cat.max_selections : 1}" required class="w-full p-4 bg-gray-50 rounded-2xl border-2 border-transparent focus:border-red-600 outline-none font-bold">
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-black text-gray-400 uppercase mb-1">Orden (Posición)</label>
+                        <input type="number" name="order_index" value="${cat ? cat.order_index : 1}" required class="w-full p-4 bg-gray-50 rounded-2xl border-2 border-transparent focus:border-red-600 outline-none font-bold">
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-[10px] font-black text-gray-400 uppercase mb-1">Tipo de Producto</label>
+                    <select name="product_type" class="w-full p-4 bg-gray-50 rounded-2xl border-2 border-transparent focus:border-red-600 outline-none font-bold">
+                        <option value="ambos" ${cat?.product_type === 'ambos' ? 'selected' : ''}>AMBOS</option>
+                        <option value="burrito" ${cat?.product_type === 'burrito' ? 'selected' : ''}>BURRITO</option>
+                        <option value="tortihamburguesa" ${cat?.product_type === 'tortihamburguesa' ? 'selected' : ''}>TORTIHAMBURGUESA</option>
+                    </select>
+                </div>
+                <div class="flex items-center gap-3 py-2">
+                    <input type="checkbox" name="is_required" id="is_req" ${cat?.is_required ? 'checked' : ''} class="w-5 h-5 rounded-lg">
+                    <label for="is_req" class="text-sm font-bold text-gray-600">Es obligatorio</label>
+                </div>
+                <div class="flex items-center gap-3 py-2 border-t mt-4 pt-4">
+                    <input type="checkbox" name="is_active" id="is_active_cat" ${(!cat || Number(cat.is_active) === 1) ? 'checked' : ''} class="w-5 h-5 rounded-lg">
+                    <label for="is_active_cat" class="text-sm font-black text-red-600 uppercase tracking-widest">Categoría Activa</label>
+                </div>
+                <div class="flex gap-4 pt-4">
+                    <button type="button" onclick="closeModal()" class="flex-1 py-4 bg-gray-100 rounded-2xl font-black text-gray-500">CANCELAR</button>
+                    <button type="submit" class="flex-[2] py-4 bg-red-600 text-white rounded-2xl font-black shadow-lg">GUARDAR</button>
+                </div>
+            </form>
+        `;
+        overlay.classList.remove('hidden');
+
+        document.getElementById('categoryForm').onsubmit = async (e) => {
+            e.preventDefault();
+            const formData = new FormData(e.target);
+            const data = Object.fromEntries(formData);
+            data.is_required = formData.get('is_required') === 'on' ? 1 : 0;
+            data.is_active = formData.get('is_active') === 'on' ? 1 : 0;
+            const id = data.id;
+            const method = id ? 'POST' : 'POST'; // We use POST for both but with /id for update in api.php logic
+            const url = id ? `${apiBase}/index.php?route=categories/${id}` : `${apiBase}/index.php?route=categories`;
+            
+            await fetch(url, { method, body: JSON.stringify(data) });
+            showToast(id ? 'Categoría actualizada' : 'Categoría creada');
+            closeModal();
+            loadViewData();
+        };
+    }
+
+    function openOptionModal(opt = null) {
+        const overlay = document.getElementById('modalOverlay');
+        const content = document.getElementById('modalContent');
+        content.className = "bg-white w-full max-w-lg rounded-3xl shadow-2xl overflow-y-auto p-8 max-h-[95vh] custom-scrollbar";
+        
+        content.innerHTML = `
+            <h3 class="text-2xl font-black mb-6 uppercase">${opt ? 'Editar Ingrediente' : 'Nuevo Ingrediente'}</h3>
+            <form id="optionForm" class="space-y-4">
+                <input type="hidden" name="id" value="${opt ? opt.id : ''}">
+                <div>
+                    <label class="block text-[10px] font-black text-gray-400 uppercase mb-1">Categoría</label>
+                    <select name="category_id" required class="w-full p-4 bg-gray-50 rounded-2xl border-2 border-transparent focus:border-red-600 outline-none font-bold">
+                        ${dataCache.categories.map(c => `<option value="${c.id}" ${opt?.category_id == c.id ? 'selected' : ''}>${c.name}</option>`).join('')}
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-[10px] font-black text-gray-400 uppercase mb-1">Nombre del ingrediente</label>
+                    <input type="text" name="name" value="${opt ? opt.name : ''}" required class="w-full p-4 bg-gray-50 rounded-2xl border-2 border-transparent focus:border-red-600 outline-none font-bold">
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-[10px] font-black text-gray-400 uppercase mb-1">Precio Base (Burrito)</label>
+                        <input type="number" name="price_base" value="${opt ? opt.price_base : 0}" required class="w-full p-4 bg-gray-50 rounded-2xl border-2 border-transparent focus:border-red-600 outline-none font-bold">
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-black text-gray-400 uppercase mb-1">Precio Extra (Adición)</label>
+                        <input type="number" name="price_extra" value="${opt ? opt.price_extra : 0}" required class="w-full p-4 bg-gray-50 rounded-2xl border-2 border-transparent focus:border-red-600 outline-none font-bold">
+                    </div>
+                </div>
+                <div class="flex items-center gap-3 py-2">
+                    <input type="checkbox" name="is_active" id="is_act" ${(!opt || Number(opt.is_active) !== 0) ? 'checked' : ''} class="w-5 h-5 rounded-lg">
+                    <label for="is_act" class="text-sm font-bold text-gray-600">Disponible (Activo)</label>
+                </div>
+                <div class="flex gap-4 pt-4">
+                    <button type="button" onclick="closeModal()" class="flex-1 py-4 bg-gray-100 rounded-2xl font-black text-gray-500">CANCELAR</button>
+                    <button type="submit" class="flex-[2] py-4 bg-red-600 text-white rounded-2xl font-black shadow-lg">GUARDAR</button>
+                </div>
+            </form>
+        `;
+        overlay.classList.remove('hidden');
+
+        document.getElementById('optionForm').onsubmit = async (e) => {
+            e.preventDefault();
+            const formData = new FormData(e.target);
+            const data = Object.fromEntries(formData);
+            data.is_active = formData.get('is_active') === 'on' ? 1 : 0;
+            const id = data.id;
+            const url = id ? `${apiBase}/index.php?route=options/${id}` : `${apiBase}/index.php?route=options`;
+            
+            await fetch(url, { method: 'POST', body: JSON.stringify(data) });
+            showToast(id ? 'Ingrediente actualizado' : 'Ingrediente creado');
+            closeModal();
+            loadViewData();
+        };
+    }
+
+    function closeModal() {
+        document.getElementById('modalOverlay').classList.add('hidden');
+    }
+
+    window.editCategory = (cat) => openCategoryModal(cat);
+    window.editOption = (opt) => openOptionModal(opt);
+
+    window.viewOrderDetail = (id) => {
+        const order = dataCache.orders.find(o => o.id == id);
+        if (!order) return;
+
+        const overlay = document.getElementById('modalOverlay');
+        const content = document.getElementById('modalContent');
+        content.className = "bg-white w-full max-w-4xl rounded-3xl shadow-2xl overflow-y-auto p-8 max-h-[95vh] custom-scrollbar";
+        
+        content.innerHTML = `
+            <div class="flex justify-between items-start mb-6">
+                <div>
+                    <div class="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">DETALLE DE PREPARACIÓN #${order.id}</div>
+                    <h3 class="text-4xl font-black uppercase text-gray-800 leading-none">${order.customer_name}</h3>
+                    <p class="text-xl font-bold text-gray-500 mt-2">${order.customer_phone || 'Sin teléfono'}</p>
+                </div>
+                <button onclick="closeModal()" class="text-3xl text-gray-400 hover:text-red-600 transition-colors">✕</button>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                <div class="md:col-span-2 bg-red-50 rounded-[1.5rem] p-6 border border-red-100 flex items-center justify-between">
+                    <div>
+                        <div class="flex items-center gap-3 mb-1">
+                            <span class="text-2xl">${order.delivery_type === 'domicilio' ? '🛵' : '🥡'}</span>
+                            <span class="font-black uppercase tracking-[0.2em] text-red-700 text-[10px]">${order.delivery_type}</span>
+                        </div>
+                        <div class="text-xl font-black text-gray-800 uppercase tracking-tighter">
+                            ${order.customer_address ? `📍 ${order.customer_address}` : 'Retira en el local'}
+                        </div>
+                    </div>
+                    <div class="text-right">
+                        <p class="text-[10px] font-black text-red-400 uppercase">Total</p>
+                        <p class="text-3xl font-black text-red-600 tracking-tighter">${money(order.total)}</p>
+                    </div>
+                </div>
+                <div class="bg-gray-900 rounded-[1.5rem] p-6 text-white flex flex-col justify-center text-center">
+                    <p class="text-[9px] font-black text-gray-400 uppercase mb-1">Estado</p>
+                    <span class="text-lg font-black uppercase tracking-widest ${
+                        order.status === 'pendiente' ? 'text-yellow-400' :
+                        order.status === 'aceptado' ? 'text-green-400' : 'text-red-400'
+                    }">${order.status}</span>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 max-h-[50vh] overflow-y-auto pr-4 custom-scrollbar">
+                ${order.items.map(item => `
+                    <div class="bg-white rounded-[2rem] p-6 border-2 border-gray-100 shadow-sm hover:border-red-200 transition-colors">
+                        <div class="flex justify-between items-center mb-6 border-b-2 border-dashed border-gray-100 pb-4">
+                            <span class="text-2xl font-black text-gray-800 uppercase tracking-tight">${item.product_type}</span>
+                            <span class="bg-red-600 text-white px-3 py-1 rounded-lg font-black text-xs uppercase">X1</span>
+                        </div>
+                        <ul class="space-y-3">
+                            ${item.options.map(opt => `
+                                <li class="flex items-start gap-3 text-lg">
+                                    <span class="text-red-600 font-black mt-1">●</span>
+                                    <span class="font-bold text-gray-700 uppercase tracking-tight leading-tight">${opt.name}</span>
+                                </li>
+                            `).join('')}
+                        </ul>
+                        ${item.notes ? `
+                            <div class="mt-6 p-4 bg-yellow-50 rounded-2xl border border-yellow-100">
+                                <p class="text-[10px] font-black text-yellow-600 uppercase mb-1 tracking-widest">Notas Especiales</p>
+                                <p class="text-sm font-bold text-gray-800 italic leading-relaxed">"${item.notes}"</p>
+                            </div>
+                        ` : ''}
+                    </div>
+                `).join('')}
+            </div>
+
+            <div class="mt-8 pt-8 border-t flex gap-4">
+                ${order.status === 'pendiente' ? `
+                    <button onclick="updateOrderStatus(${order.id}, 'aceptado'); closeModal();" class="flex-[2] py-6 bg-green-500 text-white rounded-[1.5rem] font-black shadow-xl hover:bg-green-600 transition-all uppercase tracking-widest text-lg transform hover:scale-[1.02] active:scale-95">✓ CONFIRMAR Y PREPARAR</button>
+                    <button onclick="updateOrderStatus(${order.id}, 'cancelado'); closeModal();" class="flex-1 py-6 bg-red-100 text-red-600 rounded-[1.5rem] font-black hover:bg-red-200 transition-all uppercase tracking-widest text-sm">✕ RECHAZAR</button>
+                ` : `
+                    <button onclick="window.open('${apiBase}/index.php?route=orders/${order.id}/print')" class="flex-[2] py-6 bg-slate-800 text-white rounded-[1.5rem] font-black shadow-xl hover:bg-slate-900 transition-all uppercase tracking-widest text-lg transform hover:scale-[1.02] active:scale-95">🖨️ IMPRIMIR TICKET NUEVAMENTE</button>
+                    <button onclick="closeModal()" class="flex-1 py-6 bg-gray-100 text-gray-500 rounded-[1.5rem] font-black hover:bg-gray-200 transition-all uppercase tracking-widest text-sm">CERRAR DETALLE</button>
+                `}
+            </div>
+        `;
+        overlay.classList.remove('hidden');
+    }
+
+    window.deleteCategory = async (id) => {
+        showConfirm('¿Seguro? Si tiene ingredientes asociados, se desactivará en lugar de borrarse.', async () => {
+            await fetch(`${apiBase}/index.php?route=categories/${id}`, { method: 'DELETE' });
+            showToast('Categoría procesada correctamente');
+            loadViewData();
+        });
+    };
+    
+    window.deleteOption = async (id) => {
+        showConfirm('¿Borrar este ingrediente del menú?', async () => {
+            await fetch(`${apiBase}/index.php?route=options/${id}`, { method: 'DELETE' });
+            showToast('Ingrediente eliminado');
+            loadViewData();
+        });
+    };
+
+    async function saveSettings() {
+        const val = document.getElementById('costoDomicilioInput').value;
+        await fetch(`${apiBase}/index.php?route=settings`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ key: 'costo_domicilio', value: val })
+        });
+        showToast('Ajustes guardados correctamente');
+    }
+
+    window.updateOrderStatus = async (id, status) => {
+        await fetch(`${apiBase}/index.php?route=orders/${id}/${status}`, { method: 'POST' });
+        
+        let msg = status === 'aceptado' ? 'Pedido confirmado' : 
+                  status === 'cancelado' ? 'Pedido cancelado' : 'Pedido reactivado';
+        
+        showToast(msg, status === 'cancelado' ? 'error' : 'success');
+        loadViewData();
+    };
+
+    // Auto Refresh
+    setInterval(() => {
+        const diff = Math.floor((new Date() - lastUpdate) / 1000);
+        document.getElementById('updateTimer').textContent = `Actualizado hace: ${diff}s`;
+        if (diff > 30) loadViewData();
+    }, 1000);
+
+    // Initial Load
+    document.addEventListener('DOMContentLoaded', () => {
+        if (!localStorage.getItem('deliburrito_admin')) {
+            window.location.href = '/admin/login/';
+            return;
+        }
+        switchView('orders');
+    });
+
+    document.getElementById('refreshBtn').onclick = loadViewData;
+    document.getElementById('logoutBtn').onclick = () => {
+        localStorage.removeItem('deliburrito_admin');
+        window.location.href = '/admin/login/';
+    };
+  </script>
+</body>
+</html>
