@@ -1,5 +1,11 @@
 import React, { useState } from 'react';
 
+// ── Helper: lee el token CSRF de la cookie que Laravel establece ──────────
+function getCsrfToken() {
+  const match = document.cookie.match(/XSRF-TOKEN=([^;]+)/);
+  return match ? decodeURIComponent(match[1]) : '';
+}
+
 export default function Checkout({ cartItems, onBack, onSuccess, onRemoveItem, showToast }) {
   const [formData, setFormData] = useState({
     customer_name: '',
@@ -12,8 +18,9 @@ export default function Checkout({ cartItems, onBack, onSuccess, onRemoveItem, s
   const [error, setError] = useState(null);
   const [dbSettings, setDbSettings] = useState({ costo_domicilio: 5000 });
 
+  // ALTA-03: fetch al endpoint limitado /public-config en lugar de /settings completo
   React.useEffect(() => {
-    fetch('/settings')
+    fetch('/public-config')
       .then(res => res.json())
       .then(data => {
         const delivery = data.find(s => s.key === 'costo_domicilio');
@@ -50,7 +57,11 @@ export default function Checkout({ cartItems, onBack, onSuccess, onRemoveItem, s
 
       const response = await fetch('/orders', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          // MEDIA-04: enviar el token CSRF que Laravel pone en la cookie XSRF-TOKEN
+          'X-XSRF-TOKEN': getCsrfToken(),
+        },
         body: JSON.stringify(payload),
       });
 

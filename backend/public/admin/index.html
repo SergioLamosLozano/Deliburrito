@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Admin Dashboard - Deli Burrito</title>
+  <link rel="icon" type="image/x-icon" href="/deliburrito.ico" />
   <script src="https://cdn.tailwindcss.com"></script>
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;900&display=swap" rel="stylesheet">
   <style>
@@ -40,6 +41,9 @@
       </nav>
 
       <div class="p-6 bg-red-900/50 border-t border-white/10">
+        <div class="flex justify-center mb-4">
+          <img src="/deliburrito.webp" alt="Deli Burrito" class="h-16 w-auto opacity-90" />
+        </div>
         <button id="logoutBtn" class="w-full py-3 bg-yellow-400 hover:bg-yellow-300 text-red-900 rounded-xl font-black text-sm transition-all shadow-lg transform active:scale-95">
           CERRAR SESIÓN
         </button>
@@ -71,10 +75,18 @@
           </div>
 
           <!-- TABS DE PEDIDOS -->
-          <div class="flex gap-2 mb-8 bg-gray-200/50 p-1.5 rounded-2xl w-fit">
-              <button onclick="setOrderTab('pendiente')" id="tab-pendiente" class="order-tab px-6 py-3 rounded-xl font-black text-[10px] uppercase transition-all">Nuevos / Pendientes</button>
-              <button onclick="setOrderTab('aceptado')" id="tab-aceptado" class="order-tab px-6 py-3 rounded-xl font-black text-[10px] uppercase transition-all">Confirmados</button>
-              <button onclick="setOrderTab('cancelado')" id="tab-cancelado" class="order-tab px-6 py-3 rounded-xl font-black text-[10px] uppercase transition-all">Historial / Cancelados</button>
+          <div class="flex flex-wrap items-center gap-3 mb-8">
+              <div class="flex gap-2 bg-gray-200/50 p-1.5 rounded-2xl">
+                  <button onclick="setOrderTab('pendiente')" id="tab-pendiente" class="order-tab px-6 py-3 rounded-xl font-black text-[10px] uppercase transition-all">Nuevos / Pendientes</button>
+                  <button onclick="setOrderTab('aceptado')" id="tab-aceptado" class="order-tab px-6 py-3 rounded-xl font-black text-[10px] uppercase transition-all">Confirmados</button>
+                  <button onclick="setOrderTab('cancelado')" id="tab-cancelado" class="order-tab px-6 py-3 rounded-xl font-black text-[10px] uppercase transition-all">Historial / Cancelados</button>
+              </div>
+              <div id="date-filter-group" class="flex gap-2 bg-gray-200/50 p-1.5 rounded-2xl ml-auto">
+                  <button onclick="setDateFilter('today')" id="filter-today" class="date-filter-btn px-4 py-3 rounded-xl font-black text-[10px] uppercase transition-all">Hoy</button>
+                  <button onclick="setDateFilter('yesterday')" id="filter-yesterday" class="date-filter-btn px-4 py-3 rounded-xl font-black text-[10px] uppercase transition-all">Ayer</button>
+                  <button onclick="setDateFilter('week')" id="filter-week" class="date-filter-btn px-4 py-3 rounded-xl font-black text-[10px] uppercase transition-all">7 días</button>
+                  <button onclick="setDateFilter('all')" id="filter-all" class="date-filter-btn px-4 py-3 rounded-xl font-black text-[10px] uppercase transition-all">Todos</button>
+              </div>
           </div>
 
           <div id="ordersGrid" class="grid grid-cols-1 xl:grid-cols-2 gap-6"></div>
@@ -164,8 +176,24 @@
     const apiBase = '';
     let currentView = 'orders';
     let currentOrderTab = 'pendiente';
+    let currentDateFilter = 'today';
     let dataCache = { orders: [], categories: [], options: [] };
     const money = (val) => new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(val);
+
+    const timeAgo = (dateStr) => {
+        // MySQL devuelve "2026-05-04 21:00:00" sin zona horaria.
+        // Reemplazamos el espacio por T para que se parsee como hora local y no UTC.
+        const local = dateStr ? dateStr.replace(' ', 'T') : null;
+        if (!local) return '';
+        const diff = Math.floor((new Date() - new Date(local)) / 1000);
+        if (diff < 60) return `${diff} seg`;
+        if (diff < 3600) {
+            const m = Math.floor(diff / 60);
+            return m === 1 ? '1 minuto' : `${m} minutos`;
+        }
+        const h = Math.floor(diff / 3600);
+        return h === 1 ? '1 hora' : `${h} horas`;
+    };
 
     window.showToast = (message, type = 'success') => {
         const id = Date.now();
@@ -224,7 +252,45 @@
         const active = document.getElementById(`tab-${tab}`);
         active.classList.remove('text-gray-500', 'hover:text-gray-700');
         active.classList.add('bg-white', 'text-red-600', 'shadow-sm');
+
+        // Mostrar/ocultar filtro de fecha según la tab
+        const dateFilterEl = document.getElementById('date-filter-group');
+        if (dateFilterEl) {
+            dateFilterEl.style.display = tab === 'pendiente' ? 'none' : 'flex';
+        }
+
         renderOrders();
+    }
+
+    function setDateFilter(filter) {
+        currentDateFilter = filter;
+        document.querySelectorAll('.date-filter-btn').forEach(el => {
+            el.classList.remove('bg-white', 'text-red-600', 'shadow-sm');
+            el.classList.add('text-gray-500', 'hover:text-gray-700');
+        });
+        const active = document.getElementById(`filter-${filter}`);
+        active.classList.remove('text-gray-500', 'hover:text-gray-700');
+        active.classList.add('bg-white', 'text-red-600', 'shadow-sm');
+        renderOrders();
+    }
+
+    function filterByDate(orders) {
+        if (currentOrderTab === 'pendiente') return orders;
+
+        const now = new Date();
+        const todayStart    = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
+        const yesterdayStart = new Date(todayStart); yesterdayStart.setDate(todayStart.getDate() - 1);
+        const weekStart      = new Date(todayStart); weekStart.setDate(todayStart.getDate() - 7);
+
+        return orders.filter(o => {
+            if (!o.created_at) return currentDateFilter === 'all';
+            const d = new Date(o.created_at.replace(' ', 'T'));
+            if (isNaN(d)) return currentDateFilter === 'all';
+            if (currentDateFilter === 'today')     return d >= todayStart;
+            if (currentDateFilter === 'yesterday') return d >= yesterdayStart && d < todayStart;
+            if (currentDateFilter === 'week')      return d >= weekStart && d < todayStart;
+            return true; // 'all'
+        });
     }
 
     function switchView(viewName) {
@@ -269,14 +335,25 @@
     function renderOrders() {
         const grid = document.getElementById('ordersGrid');
         const allOrders = dataCache.orders;
-        const filtered = allOrders.filter(o => o.status === currentOrderTab);
+        const byStatus = allOrders.filter(o => o.status === currentOrderTab);
+        const filtered = currentOrderTab === 'pendiente'
+            ? byStatus
+            : filterByDate(byStatus).sort((a, b) => {
+                const da = new Date((a.updated_at || '').replace(' ', 'T'));
+                const db = new Date((b.updated_at || '').replace(' ', 'T'));
+                return db - da; // más reciente primero
+              });
         
         document.getElementById('statsTotal').textContent = allOrders.length;
         document.getElementById('statsPending').textContent = allOrders.filter(o => o.status === 'pendiente').length;
         document.getElementById('statsAccepted').textContent = allOrders.filter(o => o.status === 'aceptado').length;
         document.getElementById('statsCancelled').textContent = allOrders.filter(o => o.status === 'cancelado').length;
 
-        grid.innerHTML = filtered.map(order => `
+        grid.innerHTML = filtered.map(order => {
+            const tiempoAceptado = order.status === 'aceptado'
+                ? timeAgo(order.updated_at || order.created_at)
+                : '';
+            return `
             <article onclick="viewOrderDetail(${order.id})" class="bg-white rounded-3xl shadow-sm border border-gray-100 p-6 hover:shadow-xl transition-all cursor-pointer group animate-in fade-in duration-500">
                 <div class="flex justify-between items-start mb-4">
                     <div>
@@ -304,16 +381,24 @@
                         <p class="text-[10px] font-black text-gray-400 uppercase">Total</p>
                         <p class="text-2xl font-black text-red-600 tracking-tighter">${money(order.total)}</p>
                     </div>
-                    <div class="flex gap-2">
-                        ${order.status === 'pendiente' ? `
-                            <button onclick="event.stopPropagation(); updateOrderStatus(${order.id}, 'aceptado')" class="p-3 bg-green-500 text-white rounded-xl hover:bg-green-600 transition-colors shadow-lg" title="Aceptar">✓</button>
-                            <button onclick="event.stopPropagation(); updateOrderStatus(${order.id}, 'cancelado')" class="p-3 bg-red-100 text-red-600 rounded-xl hover:bg-red-200 transition-colors" title="Cancelar">✕</button>
+                    <div class="flex flex-col items-end gap-2">
+                        <div class="flex gap-2">
+                            ${order.status === 'pendiente' ? `
+                                <button onclick="event.stopPropagation(); updateOrderStatus(${order.id}, 'aceptado')" class="p-3 bg-green-500 text-white rounded-xl hover:bg-green-600 transition-colors shadow-lg" title="Aceptar">✓</button>
+                                <button onclick="event.stopPropagation(); updateOrderStatus(${order.id}, 'cancelado')" class="p-3 bg-red-100 text-red-600 rounded-xl hover:bg-red-200 transition-colors" title="Cancelar">✕</button>
+                            ` : ''}
+                            <button onclick="event.stopPropagation(); window.open('${apiBase}/index.php?route=orders/${order.id}/print')" class="p-3 bg-slate-800 text-white rounded-xl hover:bg-slate-900 transition-colors shadow-lg" title="Imprimir">🖨️</button>
+                        </div>
+                        ${order.status === 'aceptado' ? `
+                            <span class="text-[10px] font-black text-green-600 bg-green-50 px-3 py-1.5 rounded-full uppercase tracking-wide">
+                                Aceptado hace ${tiempoAceptado}
+                            </span>
                         ` : ''}
-                        <button onclick="event.stopPropagation(); window.open('${apiBase}/index.php?route=orders/${order.id}/print')" class="p-3 bg-slate-800 text-white rounded-xl hover:bg-slate-900 transition-colors shadow-lg" title="Imprimir">🖨️</button>
                     </div>
                 </div>
             </article>
-        `).join('') || `
+        `;
+        }).join('') || `
             <div class="col-span-full py-20 text-center">
                 <div class="text-4xl mb-4">💨</div>
                 <p class="text-gray-400 font-black uppercase text-xs tracking-widest">No hay pedidos en esta sección</p>
@@ -627,12 +712,33 @@
     }
 
     window.updateOrderStatus = async (id, status) => {
+        // Buscar el pedido ANTES del fetch (comparación con == para evitar problemas string/number)
+        const order = dataCache.orders.find(o => o.id == id);
+
         await fetch(`${apiBase}/index.php?route=orders/${id}/${status}`, { method: 'POST' });
         
         let msg = status === 'aceptado' ? 'Pedido confirmado' : 
                   status === 'cancelado' ? 'Pedido cancelado' : 'Pedido reactivado';
         
         showToast(msg, status === 'cancelado' ? 'error' : 'success');
+
+        // Si se acepta y hay teléfono, abrir WhatsApp
+        if (status === 'aceptado' && order && order.customer_phone) {
+            let phone = order.customer_phone.replace(/[\s\-\(\)\+]/g, '');
+            if (!phone.startsWith('57')) {
+                phone = '57' + phone;
+            }
+            const texto = `Hola ${order.customer_name}, tu pedido #${order.id} ha sido aceptado y está en preparación. Gracias por elegir Deli Burrito!`;
+            // Usar location.href en un anchor para evitar bloqueo de popups
+            const a = document.createElement('a');
+            a.href = `https://wa.me/${phone}?text=${encodeURIComponent(texto)}`;
+            a.target = '_blank';
+            a.rel = 'noopener';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+        }
+
         loadViewData();
     };
 
@@ -645,17 +751,30 @@
 
     // Initial Load
     document.addEventListener('DOMContentLoaded', () => {
-        if (!localStorage.getItem('deliburrito_admin')) {
-            window.location.href = '/admin/login/';
-            return;
-        }
-        switchView('orders');
+        // Verificar sesion real contra el servidor
+        fetch('/index.php?route=admin-check', { credentials: 'include' })
+            .then(r => r.json())
+            .then(data => {
+                if (!data.authenticated) {
+                    window.location.href = '/admin/login/';
+                    return;
+                }
+                switchView('orders');
+                setOrderTab('pendiente');
+                setDateFilter('today');
+            })
+            .catch(() => {
+                window.location.href = '/admin/login/';
+            });
     });
 
     document.getElementById('refreshBtn').onclick = loadViewData;
     document.getElementById('logoutBtn').onclick = () => {
-        localStorage.removeItem('deliburrito_admin');
-        window.location.href = '/admin/login/';
+        fetch('/index.php?route=admin-logout', { method: 'POST', credentials: 'include' })
+            .finally(() => {
+                sessionStorage.removeItem('deliburrito_admin_session');
+                window.location.href = '/admin/login/';
+            });
     };
   </script>
 </body>

@@ -2,17 +2,19 @@
 
 namespace App\Models;
 
-use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
-use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Facades\Hash;
 
 class User extends Authenticatable
 {
-    use HasFactory, Notifiable;
+    use HasFactory;
 
-    protected $fillable = ['name', 'email', 'password', 'role'];
+    /**
+     * MEDIA-01: Solo name y email son asignables masivamente.
+     * password y role se asignan siempre de forma explicita en el codigo.
+     */
+    protected $fillable = ['name', 'email'];
 
     protected $hidden = ['password', 'remember_token'];
 
@@ -20,15 +22,14 @@ class User extends Authenticatable
         'email_verified_at' => 'datetime',
     ];
 
-    // Mutator: always hash passwords when setting attribute
-    public function setPasswordAttribute($value)
+    /**
+     * Mutator: hashea la contrasena automaticamente al asignarla directamente.
+     * Detecta si ya esta hasheada (bcrypt) para no doble-hashear.
+     */
+    public function setPasswordAttribute(string $value): void
     {
-        if (empty($value)) return;
-        // If already hashed (starts with $2y$), avoid double hashing
-        if (str_starts_with($value, '$2y$') || str_starts_with($value, '$2a$')) {
-            $this->attributes['password'] = $value;
-        } else {
-            $this->attributes['password'] = Hash::make($value);
-        }
+        $this->attributes['password'] = str_starts_with($value, '$2y$') || str_starts_with($value, '$2a$')
+            ? $value
+            : Hash::make($value);
     }
 }

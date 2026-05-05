@@ -47,6 +47,21 @@ if (!empty($_GET['route'])) {
     $path = preg_replace('#^/index\.php#', '', $path);
 }
 
+// ── Session helpers ───────────────────────────────────────────────────────
+session_start();
+
+function isAdminAuthenticated(): bool {
+    return !empty($_SESSION['admin_authenticated']) && $_SESSION['admin_authenticated'] === true;
+}
+
+function requireAdmin(): void {
+    if (!isAdminAuthenticated()) {
+        http_response_code(401);
+        echo json_encode(['error' => 'No autenticado', 'redirect' => '/admin/login/']);
+        exit;
+    }
+}
+
 // Routes
 try {
     if ($method === 'GET' && ($path === '/' || $path === '')) {
@@ -54,7 +69,27 @@ try {
         readfile(__DIR__ . '/index.html');
         exit;
     }
-    
+
+    // ── Admin login endpoint ───────────────────────────────────────────────
+    if ($method === 'POST' && $path === '/admin-login') {
+        handleAdminLogin($db);
+        exit;
+    }
+
+    // ── Admin logout endpoint ──────────────────────────────────────────────
+    if ($method === 'POST' && $path === '/admin-logout') {
+        $_SESSION = [];
+        session_destroy();
+        echo json_encode(['ok' => true]);
+        exit;
+    }
+
+    // ── Admin session check ────────────────────────────────────────────────
+    if ($method === 'GET' && $path === '/admin-check') {
+        echo json_encode(['authenticated' => isAdminAuthenticated()]);
+        exit;
+    }
+
     if ($method === 'POST' && $path === '/orders') {
         handleCreateOrder($db);
     } elseif ($method === 'GET' && $path === '/orders') {
@@ -69,21 +104,37 @@ try {
         handlePrintOrder($db, $matches[1]);
     } elseif ($path === '/categories' || $path === '/menu') {
         if ($method === 'GET') handleListCategories($db, $path === '/menu');
-        elseif ($method === 'POST') handleCreateCategory($db);
+        elseif ($method === 'POST') { requireAdmin(); handleCreateCategory($db); }
     } elseif (preg_match('/^\/categories\/(\d+)$/', $path, $matches)) {
+        requireAdmin();
         if ($method === 'POST' || $method === 'PUT') handleUpdateCategory($db, $matches[1]);
         elseif ($method === 'DELETE') handleDeleteCategory($db, $matches[1]);
     } elseif ($path === '/options') {
-        if ($method === 'GET') handleListOptions($db);
-        elseif ($method === 'POST') handleCreateOption($db);
+        if ($method === 'GET') { requireAdmin(); handleListOptions($db); }
+        elseif ($method === 'POST') { requireAdmin(); handleCreateOption($db); }
     } elseif (preg_match('/^\/options\/(\d+)$/', $path, $matches)) {
+        requireAdmin();
         if ($method === 'POST' || $method === 'PUT') handleUpdateOption($db, $matches[1]);
         elseif ($method === 'DELETE') handleDeleteOption($db, $matches[1]);
     } elseif ($path === '/settings') {
+        requireAdmin();
         if ($method === 'GET') handleListSettings($db);
         elseif ($method === 'POST') handleUpdateSetting($db);
     } elseif ($path === '/reports') {
+        requireAdmin();
         handleReports($db);
+    } elseif (preg_match('/^\/orders\/(\d+)\/(aceptado|cancelado|pendiente)$/', $path, $matches)) {
+        requireAdmin();
+        $status = $matches[2];
+        if ($status === 'aceptado') handleAcceptOrder($db, $matches[1]);
+        elseif ($status === 'cancelado') handleCancelOrder($db, $matches[1]);
+        elseif ($status === 'pendiente') handlePendientizeOrder($db, $matches[1]);
+    } elseif (preg_match('/^\/orders\/(\d+)\/print$/', $path, $matches)) {
+        requireAdmin();
+        handlePrintOrder($db, $matches[1]);
+    } elseif ($method === 'GET' && $path === '/orders') {
+        requireAdmin();
+        handleListOrders($db);
     } else {
         http_response_code(404);
         echo json_encode(['error' => 'Route not found', 'path' => $path]);
@@ -91,6 +142,56 @@ try {
 } catch (Throwable $e) {
     http_response_code(500);
     echo json_encode(['error' => 'Unhandled API error', 'details' => $e->getMessage()]);
+}
+
+// --- ADMIN AUTH ---
+
+function handleAdminLogin($db) {
+    $ip          = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
+    $attemptsKey = 'login_attempts_' . md5($ip);
+    $lockKey     = 'login_locked_'   . md5($ip);
+
+    if (!empty($_SESSION[$lockKey]) && $_SESSION[$lockKey] > time()) {
+        $wait = $_SESSION[$lockKey] - time();
+        http_response_code(429);
+        echo json_encode(['ok' => false, 'message' => "Demasiados intentos. Espera {$wait} segundos."]);
+        return;
+    }
+
+    $data     = json_decode(file_get_contents('php://input'), true);
+    $email    = trim($data['email'] ?? '');
+    $password = $data['password'] ?? '';
+
+    if (empty($email) || empty($password)) {
+        http_response_code(422);
+        echo json_encode(['ok' => false, 'message' => 'Email y contrasena son requeridos.']);
+        return;
+    }
+
+    $stmt = $db->prepare("SELECT id, password, role FROM users WHERE email = ? LIMIT 1");
+    $stmt->bind_param('s', $email);
+    $stmt->execute();
+    $user = $stmt->get_result()->fetch_assoc();
+
+    if ($user && $user['role'] === 'admin' && password_verify($password, $user['password'])) {
+        $_SESSION[$attemptsKey] = 0;
+        unset($_SESSION[$lockKey]);
+        session_regenerate_id(true);
+        $_SESSION['admin_authenticated'] = true;
+        $_SESSION['admin_user_id']        = $user['id'];
+        $_SESSION['admin_email']          = $email;
+        $token = bin2hex(random_bytes(16));
+        $_SESSION['admin_token'] = $token;
+        echo json_encode(['ok' => true, 'token' => $token]);
+    } else {
+        $_SESSION[$attemptsKey] = ($_SESSION[$attemptsKey] ?? 0) + 1;
+        if ($_SESSION[$attemptsKey] >= 5) {
+            $_SESSION[$lockKey]     = time() + 60;
+            $_SESSION[$attemptsKey] = 0;
+        }
+        http_response_code(401);
+        echo json_encode(['ok' => false, 'message' => 'Credenciales invalidas.']);
+    }
 }
 
 // --- CATEGORIES HANDLERS ---
@@ -219,7 +320,7 @@ function handleCreateOrder($db) {
     $customer_address = $data['customer_address'] ?? '';
     $delivery_type = $data['delivery_type'] ?? 'local';
 
-    $stmt = $db->prepare("INSERT INTO orders (customer_name, customer_phone, customer_address, delivery_type, subtotal, delivery_cost, total, status) VALUES (?, ?, ?, ?, ?, ?, ?, 'pendiente')");
+    $stmt = $db->prepare("INSERT INTO orders (customer_name, customer_phone, customer_address, delivery_type, subtotal, delivery_cost, total, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, 'pendiente', NOW(), NOW())");
     $stmt->bind_param('ssssddd', $customer_name, $customer_phone, $customer_address, $delivery_type, $subtotal, $delivery_cost, $total);
     $stmt->execute();
     $order_id = $stmt->insert_id;
@@ -270,17 +371,17 @@ function handleListOrders($db) {
 }
 
 function handleAcceptOrder($db, $id) {
-    $db->query("UPDATE orders SET status = 'aceptado' WHERE id = " . (int)$id);
+    $db->query("UPDATE orders SET status = 'aceptado', updated_at = NOW() WHERE id = " . (int)$id);
     echo json_encode(['ok' => true]);
 }
 
 function handleCancelOrder($db, $id) {
-    $db->query("UPDATE orders SET status = 'cancelado' WHERE id = " . (int)$id);
+    $db->query("UPDATE orders SET status = 'cancelado', updated_at = NOW() WHERE id = " . (int)$id);
     echo json_encode(['ok' => true]);
 }
 
 function handlePendientizeOrder($db, $id) {
-    $db->query("UPDATE orders SET status = 'pendiente' WHERE id = " . (int)$id);
+    $db->query("UPDATE orders SET status = 'pendiente', updated_at = NOW() WHERE id = " . (int)$id);
     echo json_encode(['ok' => true]);
 }
 

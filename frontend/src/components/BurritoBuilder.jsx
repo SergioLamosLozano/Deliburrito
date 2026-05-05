@@ -133,10 +133,16 @@ export default function BurritoBuilder({ onCheckout, initialCart = [], showToast
 
   return (
     <div className="min-h-screen bg-yellow-50">
+
+      {/* Logo de marca de agua centrado en toda la página */}
+      <div className="fixed inset-0 flex items-center justify-center pointer-events-none z-0">
+        <img src="/deliburrito.webp" alt="" className="w-[480px] max-w-[70vw] opacity-[0.06] select-none" />
+      </div>
       
       <header className="bg-red-600 text-white sticky top-0 z-50 px-4 py-4 shadow-xl">
         <div className="max-w-6xl mx-auto flex justify-between items-center">
-          <div className="cursor-pointer" onClick={() => setProductType(null)}>
+          <div className="cursor-pointer flex items-center gap-3" onClick={() => setProductType(null)}>
+            <img src="/deliburrito.webp" alt="Deli Burrito" className="h-16 w-auto" />
             <h1 className="text-2xl font-black italic tracking-tighter">DELI<span className="text-yellow-300">BURRITO</span></h1>
           </div>
           <button
@@ -155,7 +161,7 @@ export default function BurritoBuilder({ onCheckout, initialCart = [], showToast
       </header>
 
       {!productType ? (
-        <div className="max-w-4xl mx-auto p-6 flex flex-col items-center justify-center min-h-[calc(100vh-80px)]">
+        <div className="relative z-10 max-w-4xl mx-auto p-6 flex flex-col items-center justify-center min-h-[calc(100vh-80px)]">
           <h1 className="text-3xl sm:text-5xl font-black text-red-600 mb-2 text-center uppercase tracking-tighter">¿Qué te vas a armar hoy?</h1>
           <p className="text-gray-500 font-bold mb-10 text-center uppercase text-[10px] tracking-[0.2em]">Selecciona tu base preferida</p>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-8 w-full">
@@ -172,7 +178,7 @@ export default function BurritoBuilder({ onCheckout, initialCart = [], showToast
           </div>
         </div>
       ) : (
-        <main className="max-w-6xl mx-auto p-4 py-6">
+        <main className="relative z-10 max-w-6xl mx-auto p-4 py-6">
           
           <div className="bg-white/90 backdrop-blur-lg p-4 rounded-[2.5rem] shadow-xl mb-8 flex items-center gap-3 border border-gray-100 sticky top-20 z-40 overflow-x-auto no-scrollbar">
             <button onClick={() => setProductType(null)} className="w-12 h-12 sm:w-16 sm:h-16 bg-gray-100 rounded-full text-xl sm:text-3xl shadow-inner flex items-center justify-center hover:bg-gray-200 transition-colors shrink-0">🏠</button>

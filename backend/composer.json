@@ -5,7 +5,7 @@
     "require": {
         "php": "^8.2",
         "laravel/framework": "^11.0",
-        "inertiajs/inertia-laravel": "^0.6"
+        "inertiajs/inertia-laravel": "^2.0"
     },
     "require-dev": {
         "laravel/pint": "^1.0",
@@ -38,8 +38,7 @@
         "allow-plugins": {
             "pestphp/pest-plugin": true,
             "php-http/discovery": true
-        },
-        "disable-tls": true
+        }
     },
     "minimum-stability": "stable",
     "prefer-stable": true

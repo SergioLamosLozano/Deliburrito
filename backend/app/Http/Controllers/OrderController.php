@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\OrderItemOption;
@@ -16,15 +17,26 @@ class OrderController extends Controller
     public function store(Request $request)
     {
         $payload = $request->validate([
-            'customer_name' => 'required|string|max:255',
-            'customer_phone' => 'required|string|max:50',
+            'customer_name'    => 'required|string|max:255',
+            'customer_phone'   => 'required|string|max:50',
             'customer_address' => 'nullable|string|max:1000',
-            'delivery_type' => 'required|in:domicilio,local,recoger',
-            'items' => 'required|array|min:1',
-            'items.*.product_type' => 'required|string',
-            'items.*.notes' => 'nullable|string',
-            'items.*.options' => 'required|array|min:1',
-            'items.*.options.*.option_id' => 'required|integer|exists:options,id',
+            'delivery_type'    => 'required|in:domicilio,local,recoger',
+            'items'            => 'required|array|min:1|max:20',
+
+            // MEDIA-02: product_type restringido a valores conocidos
+            'items.*.product_type' => 'required|string|in:burrito,tortihamburguesa',
+
+            // MEDIA-03: notes con límite de longitud
+            'items.*.notes'    => 'nullable|string|max:500',
+
+            'items.*.options'  => 'required|array|min:1',
+
+            // BIZ-01: option_id debe existir, estar activo y pertenecer a categoría activa
+            'items.*.options.*.option_id' => [
+                'required',
+                'integer',
+                Rule::exists('options', 'id')->where(fn ($q) => $q->where('is_active', true)),
+            ],
             'items.*.options.*.is_primary' => 'sometimes|boolean',
         ]);
 
@@ -72,10 +84,13 @@ class OrderController extends Controller
                 }
 
                 $orderItem = OrderItem::create([
-                    'order_id' => $order->id,
+                    'order_id'     => $order->id,
                     'product_type' => $itemPayload['product_type'],
-                    'item_total' => $itemTotal,
-                    'notes' => $itemPayload['notes'] ?? null,
+                    'item_total'   => $itemTotal,
+                    // MEDIA-03: sanitizar notas eliminando cualquier etiqueta HTML
+                    'notes'        => isset($itemPayload['notes'])
+                                        ? strip_tags(trim($itemPayload['notes']))
+                                        : null,
                 ]);
 
                 // persist options and freeze price_charged

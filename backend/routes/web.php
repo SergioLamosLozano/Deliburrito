@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Admin\AuthController;
@@ -8,41 +8,59 @@ use App\Http\Controllers\Admin\OrderController;
 use App\Http\Controllers\Admin\ReportController;
 use App\Http\Controllers\Admin\SettingController;
 
+// ── Raíz ──────────────────────────────────────────────────────────────────
 Route::get('/', function () {
-    return 'Deli Burrito Backend - placeholder';
+    return 'Deli Burrito Backend';
 });
 
-// Public API endpoints
-Route::get('/menu', [App\Http\Controllers\MenuController::class, 'index'])->name('menu.index');
-Route::post('/orders', [App\Http\Controllers\OrderController::class, 'store'])->name('orders.store');
-Route::get('/categories', [App\Http\Controllers\MenuController::class, 'index']); // Legacy support for api.php
-Route::get('/options', [App\Http\Controllers\Admin\OptionController::class, 'index']); // Legacy support for api.php (filtered in controller usually)
+// ── Endpoint para inicializar la cookie CSRF (necesario para el fetch de React) ──
+Route::get('/sanctum/csrf-cookie', function () {
+    return response()->json(['ok' => true]);
+});
 
-// Admin auth
-Route::get('admin/login', [AuthController::class, 'showLogin'])->name('admin.login');
-Route::post('admin/login', [AuthController::class, 'login'])->name('admin.login.post');
-Route::post('admin/logout', [AuthController::class, 'logout'])->name('admin.logout');
+// ── API pública del frontend ───────────────────────────────────────────────
+Route::get('/menu',         [App\Http\Controllers\MenuController::class, 'index'])->name('menu.index');
+Route::get('/categories',   [App\Http\Controllers\MenuController::class, 'index']); // alias legacy
+Route::get('/public-config',[App\Http\Controllers\MenuController::class, 'publicConfig'])->name('public.config');
 
-Route::prefix('admin')->name('admin.')->middleware('auth')->group(function () {
-    // Categories
+// POST /orders con throttle: máximo 10 pedidos por minuto por IP
+Route::post('/orders', [App\Http\Controllers\OrderController::class, 'store'])
+    ->name('orders.store')
+    ->middleware('throttle:10,1');
+
+// ── URL del panel admin leída desde config/admin.php → .env ADMIN_PATH ───
+// Usar config() en lugar de env() garantiza que funcione con y sin caché de config
+$adminPath = config('admin.path', 'admin');
+
+// Rutas de autenticación (fuera del grupo protegido)
+Route::get("{$adminPath}/acceso",  [AuthController::class, 'showLogin'])->name('admin.login');
+Route::post("{$adminPath}/acceso", [AuthController::class, 'login'])
+    ->name('admin.login.post')
+    ->middleware('throttle:5,1');   // 5 intentos de login por minuto por IP
+Route::post("{$adminPath}/salir",  [AuthController::class, 'logout'])->name('admin.logout');
+
+// ── Panel admin protegido: requiere sesión autenticada + rol admin ─────────
+Route::prefix($adminPath)->name('admin.')->middleware(['auth', 'admin'])->group(function () {
+
+    // Categorías
     Route::get('categories/toggle/{category}', [CategoryController::class, 'toggleActive'])->name('categories.toggle');
     Route::resource('categories', CategoryController::class)->names('categories');
 
-    // Options
+    // Opciones
     Route::get('options/toggle/{option}', [OptionController::class, 'toggleActive'])->name('options.toggle');
     Route::resource('options', OptionController::class)->names('options');
 
-    // Orders
-    Route::get('orders', [OrderController::class, 'index'])->name('orders.index');
-    Route::get('orders/{order}', [OrderController::class, 'show'])->name('orders.show');
+    // Pedidos
+    Route::get('orders',                 [OrderController::class, 'index'])->name('orders.index');
+    Route::get('orders/{order}',         [OrderController::class, 'show'])->name('orders.show');
     Route::post('orders/{order}/accept', [OrderController::class, 'accept'])->name('orders.accept');
     Route::post('orders/{order}/cancel', [OrderController::class, 'cancel'])->name('orders.cancel');
-    Route::get('orders/{order}/print', [OrderController::class, 'printComanda'])->name('orders.print');
+    Route::get('orders/{order}/print',   [OrderController::class, 'printComanda'])->name('orders.print');
 
-    // Reports
+    // Reportes
     Route::get('reports', [ReportController::class, 'index'])->name('reports.index');
 
-    // Settings
+    // Configuración
     Route::get('settings', [SettingController::class, 'index'])->name('settings.index');
     Route::put('settings', [SettingController::class, 'update'])->name('settings.update');
 });

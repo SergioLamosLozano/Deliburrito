@@ -37,3 +37,7 @@ Thumbs.db
 # Project Specific
 categories.json
 api-debug.log
+
+# Security audit documents (sensitive internal information)
+SECURITY_AUDIT.md
+SECURITY_CHANGES.md

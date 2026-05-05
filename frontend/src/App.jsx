@@ -7,8 +7,12 @@ export default function App(){
   const [view, setView] = useState('builder'); // 'builder', 'checkout', 'success'
   const [cart, setCart] = useState([]);
   const [orderId, setOrderId] = useState(null);
-
   const [toasts, setToasts] = useState([]);
+
+  // MEDIA-04: inicializar la cookie CSRF de Laravel al montar la app
+  React.useEffect(() => {
+    fetch('/sanctum/csrf-cookie', { credentials: 'include' });
+  }, []);
 
   const showToast = (message, type = 'success') => {
     const id = Date.now();
