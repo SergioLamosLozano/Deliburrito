@@ -32,6 +32,9 @@
         <button data-view="categories" class="nav-btn w-full flex items-center gap-3 px-6 py-4 rounded-2xl transition-all hover:bg-white/10 font-bold">
           <span class="text-xl">🗂️</span> Categorías
         </button>
+        <button data-view="variations" class="nav-btn w-full flex items-center gap-3 px-6 py-4 rounded-2xl transition-all hover:bg-white/10 font-bold">
+          <span class="text-xl">🎛️</span> Tipos de Producto
+        </button>
         <button data-view="options" class="nav-btn w-full flex items-center gap-3 px-6 py-4 rounded-2xl transition-all hover:bg-white/10 font-bold">
           <span class="text-xl">🍕</span> Opciones / Precios
         </button>
@@ -117,6 +120,18 @@
           </div>
         </div>
 
+        <!-- View: Variations (Tipos de Producto) -->
+        <div id="view-variations" class="view-content hidden">
+          <div class="flex justify-between items-center mb-8">
+            <div>
+              <h3 class="text-2xl font-black">Tipos de Producto</h3>
+              <p class="text-gray-500">Variaciones con precio base propio (ej. Sencilla, Mixta, Doble)</p>
+            </div>
+            <button onclick="openVariationModal()" class="bg-red-600 text-white px-6 py-3 rounded-2xl font-black shadow-lg hover:bg-red-700 transition-all">+ NUEVA VARIACIÓN</button>
+          </div>
+          <div id="variationsContainer" class="space-y-6"></div>
+        </div>
+
         <!-- View: Options -->
         <div id="view-options" class="view-content hidden">
           <div class="flex justify-between items-center mb-8">
@@ -177,7 +192,7 @@
     let currentView = 'orders';
     let currentOrderTab = 'pendiente';
     let currentDateFilter = 'today';
-    let dataCache = { orders: [], categories: [], options: [] };
+    let dataCache = { orders: [], categories: [], options: [], variations: [] };
     const money = (val) => new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(val);
 
     const timeAgo = (dateStr) => {
@@ -296,6 +311,7 @@
     const viewTitles = {
         orders:     'Pedidos',
         categories: 'Categorías',
+        variations: 'Tipos de Producto',
         options:    'Opciones / Precios',
         settings:   'Ajustes',
     };
@@ -325,6 +341,9 @@
         } else if (currentView === 'categories') {
             dataCache.categories = data;
             renderCategories();
+        } else if (currentView === 'variations') {
+            dataCache.variations = Array.isArray(data) ? data : [];
+            renderVariations();
         } else if (currentView === 'options') {
             dataCache.options = data;
             renderOptions();
@@ -444,6 +463,154 @@
         `).join('');
     }
 
+    function renderVariations() {
+        const container = document.getElementById('variationsContainer');
+        const variations = dataCache.variations;
+
+        if (!variations || variations.length === 0) {
+            container.innerHTML = `
+                <div class="bg-white rounded-3xl shadow-sm border p-16 text-center">
+                    <p class="text-5xl mb-4">🎛️</p>
+                    <p class="text-gray-500 font-black uppercase text-xs tracking-widest">No hay variaciones configuradas aún</p>
+                    <p class="text-gray-400 text-sm mt-2">Crea las variaciones de tus productos para habilitar categorías condicionales.</p>
+                    <button onclick="openVariationModal()" class="mt-6 bg-red-600 text-white px-8 py-3 rounded-2xl font-black hover:bg-red-700 transition-all">Crear primera variación</button>
+                </div>`;
+            return;
+        }
+
+        const targetLabels = { tortihamburguesa: '🍔 Tortihamburguesa', burrito: '🌯 Burrito' };
+
+        // Agrupar por product_target
+        const grouped = variations.reduce((acc, v) => {
+            if (!acc[v.product_target]) acc[v.product_target] = [];
+            acc[v.product_target].push(v);
+            return acc;
+        }, {});
+
+        container.innerHTML = Object.entries(grouped).map(([target, items]) => `
+            <div class="bg-white rounded-3xl shadow-sm border overflow-hidden">
+                <div class="bg-gray-50 px-6 py-4 border-b flex items-center gap-3">
+                    <h4 class="text-xs font-black uppercase tracking-widest text-gray-500">${targetLabels[target] ?? target}</h4>
+                    <span class="ml-auto text-xs text-gray-400 font-semibold">${items.length} variación${items.length !== 1 ? 'es' : ''}</span>
+                </div>
+                <table class="w-full text-left border-collapse">
+                    <thead class="bg-gray-50 text-[10px] font-black uppercase text-gray-400 tracking-widest border-b">
+                        <tr>
+                            <th class="px-6 py-3">Nombre</th>
+                            <th class="px-6 py-3">Precio Base</th>
+                            <th class="px-6 py-3 text-center">Estado</th>
+                            <th class="px-6 py-3 text-right">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-100">
+                        ${items.map(v => `
+                            <tr class="hover:bg-gray-50 transition-colors">
+                                <td class="px-6 py-4 font-bold text-gray-800">${v.name}</td>
+                                <td class="px-6 py-4 font-black text-red-600">${money(v.base_price)}</td>
+                                <td class="px-6 py-4 text-center">
+                                    <span class="px-3 py-1 ${Number(v.is_active) === 1 ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'} rounded-full text-[10px] font-black uppercase">
+                                        ${Number(v.is_active) === 1 ? 'Activa' : 'Inactiva'}
+                                    </span>
+                                </td>
+                                <td class="px-6 py-4 text-right space-x-2">
+                                    <button onclick='editVariation(${JSON.stringify(v).replace(/'/g, "&apos;")})' class="text-blue-600 hover:underline font-bold text-[10px] uppercase">Editar</button>
+                                    <button onclick="toggleVariation(${v.id})" class="text-gray-500 hover:underline font-bold text-[10px] uppercase">${Number(v.is_active) === 1 ? 'Desactivar' : 'Activar'}</button>
+                                    <button onclick="deleteVariation(${v.id})" class="text-red-600 hover:underline font-bold text-[10px] uppercase">Eliminar</button>
+                                </td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            </div>
+        `).join('');
+    }
+
+    function openVariationModal(v = null) {
+        const overlay = document.getElementById('modalOverlay');
+        const content = document.getElementById('modalContent');
+        content.className = "bg-white w-full max-w-md rounded-3xl shadow-2xl overflow-y-auto p-8 max-h-[95vh] custom-scrollbar";
+
+        content.innerHTML = `
+            <h3 class="text-2xl font-black mb-6 uppercase">${v ? 'Editar Variación' : 'Nueva Variación'}</h3>
+            <form id="variationForm" class="space-y-5">
+                <input type="hidden" name="id" value="${v ? v.id : ''}">
+
+                <div>
+                    <label class="block text-[10px] font-black text-gray-400 uppercase mb-1">Producto al que pertenece</label>
+                    <select name="product_target" class="w-full p-4 bg-gray-50 rounded-2xl border-2 border-transparent focus:border-red-600 outline-none font-bold">
+                        <option value="tortihamburguesa" ${v?.product_target === 'tortihamburguesa' ? 'selected' : ''}>🍔 Tortihamburguesa</option>
+                        <option value="burrito" ${v?.product_target === 'burrito' ? 'selected' : ''}>🌯 Burrito</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label class="block text-[10px] font-black text-gray-400 uppercase mb-1">Nombre del Tipo</label>
+                    <input type="text" name="name" value="${v ? v.name : ''}" placeholder="ej: Sencilla, Mixta, Doble..." required
+                        class="w-full p-4 bg-gray-50 rounded-2xl border-2 border-transparent focus:border-red-600 outline-none font-bold">
+                </div>
+
+                <div>
+                    <label class="block text-[10px] font-black text-gray-400 uppercase mb-1">Precio Base</label>
+                    <div class="relative">
+                        <span class="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 font-bold">$</span>
+                        <input type="number" name="base_price" value="${v ? v.base_price : ''}" placeholder="0" min="0" step="100" required
+                            class="w-full pl-8 pr-4 p-4 bg-gray-50 rounded-2xl border-2 border-transparent focus:border-red-600 outline-none font-bold">
+                    </div>
+                </div>
+
+                <div class="flex items-center gap-3 py-2">
+                    <input type="checkbox" name="is_active" id="var_is_active" ${(!v || Number(v.is_active) === 1) ? 'checked' : ''} class="w-5 h-5 rounded-lg accent-green-600">
+                    <label for="var_is_active" class="text-sm font-bold text-gray-600">Variación Activa</label>
+                </div>
+
+                <div class="flex gap-4 pt-2">
+                    <button type="button" onclick="closeModal()" class="flex-1 py-4 bg-gray-100 rounded-2xl font-black text-gray-500">CANCELAR</button>
+                    <button type="submit" class="flex-[2] py-4 bg-red-600 text-white rounded-2xl font-black shadow-lg">GUARDAR</button>
+                </div>
+            </form>
+        `;
+        overlay.classList.remove('hidden');
+
+        document.getElementById('variationForm').onsubmit = async (e) => {
+            e.preventDefault();
+            const formData = new FormData(e.target);
+            const data = Object.fromEntries(formData);
+            data.is_active = formData.get('is_active') === 'on' ? 1 : 0;
+            const id  = data.id;
+            const url = id
+                ? `${apiBase}/index.php?route=variations/${id}`
+                : `${apiBase}/index.php?route=variations`;
+
+            await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+            showToast(id ? 'Variación actualizada' : 'Variación creada');
+            closeModal();
+            // Invalidar caché de variaciones para que el modal de categorías las recargue
+            dataCache.variations = [];
+            loadViewData();
+        };
+    }
+
+    window.editVariation   = (v)  => openVariationModal(v);
+
+    window.toggleVariation = async (id) => {
+        await fetch(`${apiBase}/index.php?route=variations/${id}/toggle`, { method: 'POST' });
+        dataCache.variations = [];
+        loadViewData();
+    };
+
+    window.deleteVariation = async (id) => {
+        showConfirm('¿Eliminar esta variación? Las categorías que la usen perderán esa condición.', async () => {
+            await fetch(`${apiBase}/index.php?route=variations/${id}`, { method: 'DELETE' });
+            showToast('Variación eliminada');
+            dataCache.variations = [];
+            loadViewData();
+        });
+    };
+
     function renderOptions() {
         const container = document.getElementById('optionsGroupedContainer');
         const options = dataCache.options;
@@ -496,9 +663,69 @@
     // --- MODALS ---
 
     function openCategoryModal(cat = null) {
+        // Asegurar que las variaciones estén cargadas para los checkboxes
+        const doOpen = () => _openCategoryModalInner(cat);
+        if (dataCache.variations.length === 0) {
+            fetch(`${apiBase}/index.php?route=variations`)
+                .then(r => r.json())
+                .then(data => { dataCache.variations = Array.isArray(data) ? data : []; doOpen(); })
+                .catch(doOpen);
+        } else {
+            doOpen();
+        }
+    }
+
+    function _openCategoryModalInner(cat = null) {
         const overlay = document.getElementById('modalOverlay');
         const content = document.getElementById('modalContent');
         content.className = "bg-white w-full max-w-lg rounded-3xl shadow-2xl overflow-y-auto p-8 max-h-[95vh] custom-scrollbar";
+
+        // IDs de variaciones ya asignadas a esta categoría (para pre-marcar checkboxes)
+        const currentVariationIds = (cat?.variations ?? []).map(v => v.id);
+
+        // Agrupar variaciones por product_target
+        const grouped = dataCache.variations.reduce((acc, v) => {
+            if (!acc[v.product_target]) acc[v.product_target] = [];
+            acc[v.product_target].push(v);
+            return acc;
+        }, {});
+
+        const targetLabels = { tortihamburguesa: 'Tortihamburguesa', burrito: 'Burrito' };
+
+        // Determinar qué targets mostrar según el product_type actual de la categoría
+        const currentType = cat?.product_type ?? 'ambos';
+        const relevantTargets = Object.keys(grouped).filter(t =>
+            currentType === 'ambos' || currentType === t
+        );
+
+        const buildCheckboxes = (type) => {
+            const targets = Object.keys(grouped).filter(t => type === 'ambos' || type === t);
+            if (targets.length === 0 || targets.every(t => grouped[t].length === 0)) {
+                return `<p class="text-xs text-gray-400 italic">No hay variaciones configuradas para este tipo. Créalas primero.</p>`;
+            }
+            return targets.map(target => `
+                <div class="mb-3">
+                    <p class="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">
+                        ${targetLabels[target] ?? target}
+                    </p>
+                    <div class="space-y-2 pl-2">
+                        ${grouped[target].map(v => `
+                            <label class="flex items-center gap-3 cursor-pointer group">
+                                <input type="checkbox"
+                                    name="variation_ids"
+                                    value="${v.id}"
+                                    ${currentVariationIds.includes(v.id) ? 'checked' : ''}
+                                    class="w-4 h-4 rounded border-gray-300 accent-red-600">
+                                <span class="text-sm font-semibold text-gray-700 group-hover:text-red-600 transition-colors">
+                                    ${v.name}
+                                    ${parseFloat(v.base_price) > 0 ? `<span class="text-gray-400 text-xs ml-1 font-normal">${money(v.base_price)}</span>` : ''}
+                                </span>
+                            </label>
+                        `).join('')}
+                    </div>
+                </div>
+            `).join('');
+        };
         
         content.innerHTML = `
             <h3 class="text-2xl font-black mb-6 uppercase">${cat ? 'Editar Categoría' : 'Nueva Categoría'}</h3>
@@ -520,20 +747,39 @@
                 </div>
                 <div>
                     <label class="block text-[10px] font-black text-gray-400 uppercase mb-1">Tipo de Producto</label>
-                    <select name="product_type" class="w-full p-4 bg-gray-50 rounded-2xl border-2 border-transparent focus:border-red-600 outline-none font-bold">
-                        <option value="ambos" ${cat?.product_type === 'ambos' ? 'selected' : ''}>AMBOS</option>
-                        <option value="burrito" ${cat?.product_type === 'burrito' ? 'selected' : ''}>BURRITO</option>
-                        <option value="tortihamburguesa" ${cat?.product_type === 'tortihamburguesa' ? 'selected' : ''}>TORTIHAMBURGUESA</option>
+                    <select name="product_type" id="modalProductType" class="w-full p-4 bg-gray-50 rounded-2xl border-2 border-transparent focus:border-red-600 outline-none font-bold">
+                        <option value="ambos" ${currentType === 'ambos' ? 'selected' : ''}>AMBOS</option>
+                        <option value="burrito" ${currentType === 'burrito' ? 'selected' : ''}>BURRITO</option>
+                        <option value="tortihamburguesa" ${currentType === 'tortihamburguesa' ? 'selected' : ''}>TORTIHAMBURGUESA</option>
                     </select>
                 </div>
                 <div class="flex items-center gap-3 py-2">
                     <input type="checkbox" name="is_required" id="is_req" ${cat?.is_required ? 'checked' : ''} class="w-5 h-5 rounded-lg">
                     <label for="is_req" class="text-sm font-bold text-gray-600">Es obligatorio</label>
                 </div>
-                <div class="flex items-center gap-3 py-2 border-t mt-4 pt-4">
+                <div class="flex items-center gap-3 py-2 border-t mt-2 pt-4">
                     <input type="checkbox" name="is_active" id="is_active_cat" ${(!cat || Number(cat.is_active) === 1) ? 'checked' : ''} class="w-5 h-5 rounded-lg">
                     <label for="is_active_cat" class="text-sm font-black text-red-600 uppercase tracking-widest">Categoría Activa</label>
                 </div>
+
+                <!-- ── Variaciones de Producto ──────────────────────── -->
+                <div class="border border-dashed border-gray-200 rounded-2xl p-4 mt-2">
+                    <p class="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1">
+                        Habilitar solo para estas variaciones
+                        <span class="font-normal text-gray-400 normal-case tracking-normal">(Opcional)</span>
+                    </p>
+                    <p class="text-xs text-gray-400 mb-3 leading-snug">
+                        Sin selección → visible para <strong>todos</strong> los pedidos del tipo elegido.<br>
+                        Con selección → solo aparece cuando el cliente elige esa variación.
+                    </p>
+                    <div id="variationCheckboxes" class="max-h-48 overflow-y-auto pr-1 custom-scrollbar">
+                        ${buildCheckboxes(currentType)}
+                    </div>
+                    <p id="varCounter" class="mt-2 text-xs text-blue-600 font-bold ${currentVariationIds.length > 0 ? '' : 'hidden'}">
+                        ✓ Habilitada para ${currentVariationIds.length} variación(es)
+                    </p>
+                </div>
+
                 <div class="flex gap-4 pt-4">
                     <button type="button" onclick="closeModal()" class="flex-1 py-4 bg-gray-100 rounded-2xl font-black text-gray-500">CANCELAR</button>
                     <button type="submit" class="flex-[2] py-4 bg-red-600 text-white rounded-2xl font-black shadow-lg">GUARDAR</button>
@@ -542,17 +788,44 @@
         `;
         overlay.classList.remove('hidden');
 
+        // Actualizar checkboxes cuando cambia el tipo de producto
+        document.getElementById('modalProductType').addEventListener('change', function() {
+            document.getElementById('variationCheckboxes').innerHTML = buildCheckboxes(this.value);
+            updateVarCounter();
+        });
+
+        // Contador en vivo
+        const updateVarCounter = () => {
+            const form = document.getElementById('categoryForm');
+            if (!form) return;
+            const checked = form.querySelectorAll('input[name="variation_ids"]:checked').length;
+            const counter = document.getElementById('varCounter');
+            if (checked > 0) {
+                counter.textContent = `✓ Habilitada para ${checked} variación(es)`;
+                counter.classList.remove('hidden');
+            } else {
+                counter.classList.add('hidden');
+            }
+        };
+        document.getElementById('variationCheckboxes').addEventListener('change', updateVarCounter);
+
         document.getElementById('categoryForm').onsubmit = async (e) => {
             e.preventDefault();
             const formData = new FormData(e.target);
             const data = Object.fromEntries(formData);
             data.is_required = formData.get('is_required') === 'on' ? 1 : 0;
-            data.is_active = formData.get('is_active') === 'on' ? 1 : 0;
-            const id = data.id;
-            const method = id ? 'POST' : 'POST'; // We use POST for both but with /id for update in api.php logic
-            const url = id ? `${apiBase}/index.php?route=categories/${id}` : `${apiBase}/index.php?route=categories`;
+            data.is_active   = formData.get('is_active')   === 'on' ? 1 : 0;
+            data.variation_ids = formData.getAll('variation_ids').map(Number);
+            const id  = data.id;
+            const url = id
+                ? `${apiBase}/index.php?route=categories/${id}`
+                : `${apiBase}/index.php?route=categories`;
             
-            await fetch(url, { method, body: JSON.stringify(data) });
+            await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
             showToast(id ? 'Categoría actualizada' : 'Categoría creada');
             closeModal();
             loadViewData();

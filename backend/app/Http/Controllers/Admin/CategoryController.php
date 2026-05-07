@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use App\Models\Category;
+use App\Models\ProductVariation;
 
 class CategoryController extends Controller
 {
@@ -31,23 +32,40 @@ class CategoryController extends Controller
     public function create()
     {
         $this->ensureAdmin();
-        return Inertia::render('Admin/Categories/Create');
+
+        // Variaciones agrupadas por product_target para los checkboxes del modal
+        $variations = ProductVariation::where('is_active', true)
+            ->orderBy('product_target')
+            ->orderBy('name')
+            ->get()
+            ->groupBy('product_target');
+
+        return Inertia::render('Admin/Categories/Create', [
+            'variations' => $variations,
+        ]);
     }
 
     public function store(Request $request)
     {
         $this->ensureAdmin();
+
         $data = $request->validate([
-            'name' => 'required|string|max:255',
-            'product_type' => 'required|string|in:burrito,tortihamburguesa,ambos',
-            'is_required' => 'sometimes|boolean',
-            'max_selections' => 'nullable|integer|min:1',
-            'order_index' => 'nullable|integer',
-            'is_active' => 'sometimes|boolean',
+            'name'          => 'required|string|max:255',
+            'product_type'  => 'required|string|in:burrito,tortihamburguesa,ambos',
+            'is_required'   => 'sometimes|boolean',
+            'max_selections'=> 'nullable|integer|min:1',
+            'order_index'   => 'nullable|integer',
+            'is_active'     => 'sometimes|boolean',
+            'variation_ids' => 'nullable|array',
+            'variation_ids.*' => 'integer|exists:product_variations,id',
         ]);
 
         $data['is_active'] = $data['is_active'] ?? true;
-        Category::create($data);
+        $variationIds = $data['variation_ids'] ?? [];
+        unset($data['variation_ids']);
+
+        $category = Category::create($data);
+        $category->variations()->sync($variationIds);
 
         return redirect()->route('admin.categories.index');
     }
@@ -55,22 +73,42 @@ class CategoryController extends Controller
     public function edit(Category $category)
     {
         $this->ensureAdmin();
-        return Inertia::render('Admin/Categories/Edit', compact('category'));
+
+        // Pre-cargar variaciones ya asignadas para marcar los checkboxes
+        $category->load('variations');
+
+        $variations = ProductVariation::where('is_active', true)
+            ->orderBy('product_target')
+            ->orderBy('name')
+            ->get()
+            ->groupBy('product_target');
+
+        return Inertia::render('Admin/Categories/Edit', [
+            'category'   => $category,
+            'variations' => $variations,
+        ]);
     }
 
     public function update(Request $request, Category $category)
     {
         $this->ensureAdmin();
+
         $data = $request->validate([
-            'name' => 'required|string|max:255',
-            'product_type' => 'required|string|in:burrito,tortihamburguesa,ambos',
-            'is_required' => 'sometimes|boolean',
-            'max_selections' => 'nullable|integer|min:1',
-            'order_index' => 'nullable|integer',
-            'is_active' => 'sometimes|boolean',
+            'name'          => 'required|string|max:255',
+            'product_type'  => 'required|string|in:burrito,tortihamburguesa,ambos',
+            'is_required'   => 'sometimes|boolean',
+            'max_selections'=> 'nullable|integer|min:1',
+            'order_index'   => 'nullable|integer',
+            'is_active'     => 'sometimes|boolean',
+            'variation_ids' => 'nullable|array',
+            'variation_ids.*' => 'integer|exists:product_variations,id',
         ]);
 
+        $variationIds = $data['variation_ids'] ?? [];
+        unset($data['variation_ids']);
+
         $category->update($data);
+        $category->variations()->sync($variationIds);
 
         return redirect()->route('admin.categories.index');
     }

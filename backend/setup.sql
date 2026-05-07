@@ -79,6 +79,29 @@ CREATE TABLE IF NOT EXISTS `order_item_options` (
     FOREIGN KEY (`option_id`) REFERENCES `options`(`id`)
 );
 
+-- Variaciones de producto (ej. Sencilla / Mixta / Doble para Tortihamburguesa)
+CREATE TABLE IF NOT EXISTS `product_variations` (
+    `id` BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    `product_target` VARCHAR(100) NOT NULL,
+    `name` VARCHAR(255) NOT NULL,
+    `base_price` DECIMAL(10,2) DEFAULT 0,
+    `is_active` BOOLEAN DEFAULT 1,
+    `created_at` TIMESTAMP NULL,
+    `updated_at` TIMESTAMP NULL
+);
+
+-- Tabla pivote: qué variaciones habilitan cada categoría
+-- Sin filas → categoría visible siempre.
+-- Con filas → visible solo cuando la variación activa coincide.
+CREATE TABLE IF NOT EXISTS `category_variation` (
+    `id` BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    `category_id` BIGINT UNSIGNED NOT NULL,
+    `product_variation_id` BIGINT UNSIGNED NOT NULL,
+    UNIQUE KEY `uq_cat_var` (`category_id`, `product_variation_id`),
+    FOREIGN KEY (`category_id`) REFERENCES `categories`(`id`) ON DELETE CASCADE,
+    FOREIGN KEY (`product_variation_id`) REFERENCES `product_variations`(`id`) ON DELETE CASCADE
+);
+
 -- Insert Initial Data
 INSERT INTO `settings` (`key`, `value`, `description`, `created_at`, `updated_at`) 
 VALUES ('costo_domicilio', '5000', 'Costo de envío a domicilio', NOW(), NOW())

@@ -109,6 +109,21 @@ try {
         requireAdmin();
         if ($method === 'POST' || $method === 'PUT') handleUpdateCategory($db, $matches[1]);
         elseif ($method === 'DELETE') handleDeleteCategory($db, $matches[1]);
+    } elseif ($path === '/variations') {
+        if ($method === 'GET') {
+            // GET es público — el cliente lo necesita para el selector de variaciones
+            handleListVariations($db);
+        } elseif ($method === 'POST') {
+            requireAdmin();
+            handleCreateVariation($db);
+        }
+    } elseif (preg_match('/^\/variations\/(\d+)\/toggle$/', $path, $matches)) {
+        requireAdmin();
+        handleToggleVariation($db, $matches[1]);
+    } elseif (preg_match('/^\/variations\/(\d+)$/', $path, $matches)) {
+        requireAdmin();
+        if ($method === 'POST' || $method === 'PUT') handleUpdateVariation($db, $matches[1]);
+        elseif ($method === 'DELETE') handleDeleteVariation($db, $matches[1]);
     } elseif ($path === '/options') {
         if ($method === 'GET') { requireAdmin(); handleListOptions($db); }
         elseif ($method === 'POST') { requireAdmin(); handleCreateOption($db); }
@@ -204,10 +219,18 @@ function handleListCategories($db, $onlyActive = false) {
     $result = $db->query($sql);
     $categories = $result->fetch_all(MYSQLI_ASSOC);
     
-    if ($onlyActive) {
-        foreach ($categories as &$cat) {
+    foreach ($categories as &$cat) {
+        if ($onlyActive) {
             $cat['options'] = $db->query("SELECT * FROM options WHERE category_id = ".$cat['id']." AND is_active = 1")->fetch_all(MYSQLI_ASSOC);
         }
+        // Cargar variaciones habilitadas para esta categoría (tabla pivote category_variation)
+        $varResult = $db->query(
+            "SELECT pv.id, pv.name, pv.product_target, pv.base_price
+             FROM product_variations pv
+             INNER JOIN category_variation cv ON cv.product_variation_id = pv.id
+             WHERE cv.category_id = " . (int)$cat['id']
+        );
+        $cat['variations'] = $varResult ? $varResult->fetch_all(MYSQLI_ASSOC) : [];
     }
     
     echo json_encode($categories);
@@ -215,32 +238,100 @@ function handleListCategories($db, $onlyActive = false) {
 
 function handleCreateCategory($db) {
     $data = json_decode(file_get_contents('php://input'), true);
-    $name = $data['name'];
-    $is_req = (int)$data['is_required'];
+    $name    = $data['name'];
+    $is_req  = (int)$data['is_required'];
     $max_sel = (int)$data['max_selections'];
-    $order = (int)$data['order_index'];
-    $type = $data['product_type'];
-    $active = (int)($data['is_active'] ?? 1);
+    $order   = (int)$data['order_index'];
+    $type    = $data['product_type'];
+    $active  = (int)($data['is_active'] ?? 1);
     
     $stmt = $db->prepare("INSERT INTO categories (name, is_required, max_selections, order_index, product_type, is_active) VALUES (?, ?, ?, ?, ?, ?)");
     $stmt->bind_param('siiisi', $name, $is_req, $max_sel, $order, $type, $active);
     $stmt->execute();
-    echo json_encode(['ok' => true, 'id' => $stmt->insert_id]);
+    $category_id = $stmt->insert_id;
+
+    // Sincronizar variaciones en la tabla pivote
+    $variationIds = isset($data['variation_ids']) ? array_filter(array_map('intval', $data['variation_ids'])) : [];
+    syncCategoryVariations($db, $category_id, $variationIds);
+
+    echo json_encode(['ok' => true, 'id' => $category_id]);
 }
 
 function handleUpdateCategory($db, $id) {
-    $data = json_decode(file_get_contents('php://input'), true);
-    $name = $data['name'] ?? '';
-    $is_req = (int)($data['is_required'] ?? 0);
+    $data    = json_decode(file_get_contents('php://input'), true);
+    $name    = $data['name'] ?? '';
+    $is_req  = (int)($data['is_required'] ?? 0);
     $max_sel = (int)($data['max_selections'] ?? 1);
-    $order = (int)($data['order_index'] ?? 0);
-    $type = $data['product_type'] ?? 'burrito';
-    $active = (int)($data['is_active'] ?? 1);
-    $id_int = (int)$id;
+    $order   = (int)($data['order_index'] ?? 0);
+    $type    = $data['product_type'] ?? 'burrito';
+    $active  = (int)($data['is_active'] ?? 1);
+    $id_int  = (int)$id;
 
     $stmt = $db->prepare("UPDATE categories SET name=?, is_required=?, max_selections=?, order_index=?, product_type=?, is_active=? WHERE id=?");
     $stmt->bind_param('siiisii', $name, $is_req, $max_sel, $order, $type, $active, $id_int);
     $stmt->execute();
+
+    // Sincronizar variaciones
+    $variationIds = isset($data['variation_ids']) ? array_filter(array_map('intval', $data['variation_ids'])) : [];
+    syncCategoryVariations($db, $id_int, $variationIds);
+
+    echo json_encode(['ok' => true]);
+}
+
+/**
+ * Sincroniza la tabla pivote category_variation.
+ * Equivalente al sync() de Eloquent: borra las existentes y reinserta.
+ */
+function syncCategoryVariations($db, int $category_id, array $variation_ids): void {
+    $db->query("DELETE FROM category_variation WHERE category_id = $category_id");
+    if (empty($variation_ids)) return;
+    $stmt = $db->prepare("INSERT IGNORE INTO category_variation (category_id, product_variation_id) VALUES (?, ?)");
+    foreach ($variation_ids as $vid) {
+        $stmt->bind_param('ii', $category_id, $vid);
+        $stmt->execute();
+    }
+}
+
+// --- PRODUCT VARIATIONS HANDLERS ---
+
+function handleListVariations($db) {
+    $result = $db->query("SELECT * FROM product_variations ORDER BY product_target, name");
+    echo json_encode($result->fetch_all(MYSQLI_ASSOC));
+}
+
+function handleCreateVariation($db) {
+    $data = json_decode(file_get_contents('php://input'), true);
+    $stmt = $db->prepare("INSERT INTO product_variations (product_target, name, base_price, is_active) VALUES (?, ?, ?, ?)");
+    $target = $data['product_target'];
+    $name   = $data['name'];
+    $price  = (float)($data['base_price'] ?? 0);
+    $active = (int)($data['is_active'] ?? 1);
+    $stmt->bind_param('ssdi', $target, $name, $price, $active);
+    $stmt->execute();
+    echo json_encode(['ok' => true, 'id' => $stmt->insert_id]);
+}
+
+function handleUpdateVariation($db, $id) {
+    $data   = json_decode(file_get_contents('php://input'), true);
+    $stmt   = $db->prepare("UPDATE product_variations SET product_target=?, name=?, base_price=?, is_active=? WHERE id=?");
+    $target = $data['product_target'];
+    $name   = $data['name'];
+    $price  = (float)($data['base_price'] ?? 0);
+    $active = (int)($data['is_active'] ?? 1);
+    $id_int = (int)$id;
+    $stmt->bind_param('ssdii', $target, $name, $price, $active, $id_int);
+    $stmt->execute();
+    echo json_encode(['ok' => true]);
+}
+
+function handleDeleteVariation($db, $id) {
+    $db->query("DELETE FROM product_variations WHERE id = " . (int)$id);
+    echo json_encode(['ok' => true]);
+}
+
+function handleToggleVariation($db, $id) {
+    $id_int = (int)$id;
+    $db->query("UPDATE product_variations SET is_active = NOT is_active WHERE id = $id_int");
     echo json_encode(['ok' => true]);
 }
 

@@ -5,6 +5,7 @@ use App\Http\Controllers\Admin\AuthController;
 use App\Http\Controllers\Admin\CategoryController;
 use App\Http\Controllers\Admin\OptionController;
 use App\Http\Controllers\Admin\OrderController;
+use App\Http\Controllers\Admin\ProductVariationController;
 use App\Http\Controllers\Admin\ReportController;
 use App\Http\Controllers\Admin\SettingController;
 
@@ -49,6 +50,12 @@ Route::prefix($adminPath)->name('admin.')->middleware(['auth', 'admin'])->group(
     // Opciones
     Route::get('options/toggle/{option}', [OptionController::class, 'toggleActive'])->name('options.toggle');
     Route::resource('options', OptionController::class)->names('options');
+
+    // Variaciones de Producto
+    Route::get('product-variations/toggle/{productVariation}', [ProductVariationController::class, 'toggleActive'])->name('product-variations.toggle');
+    Route::resource('product-variations', ProductVariationController::class)
+        ->names('product-variations')
+        ->only(['index', 'store', 'update', 'destroy']);
 
     // Pedidos
     Route::get('orders',                 [OrderController::class, 'index'])->name('orders.index');

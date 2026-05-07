@@ -27,6 +27,12 @@ export default function Layout({ children }) {
             📂 Categorías
           </Link>
           <Link
+            href="/admin/product-variations"
+            className="block px-4 py-3 rounded-lg hover:bg-red-600 transition-all font-semibold"
+          >
+            🎛️ Tipos de Producto
+          </Link>
+          <Link
             href="/admin/options"
             className="block px-4 py-3 rounded-lg hover:bg-red-600 transition-all font-semibold"
           >
