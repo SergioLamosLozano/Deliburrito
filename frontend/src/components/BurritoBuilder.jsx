@@ -128,6 +128,7 @@ export default function BurritoBuilder({ onCheckout, initialCart = [], showToast
       id: Date.now(),
       product_type: productType,
       variation_id: selectedVariation?.id ?? null,
+      variation_name: selectedVariation?.name ?? null,
       options,
       notes: '',
       item_total: currentTotal,

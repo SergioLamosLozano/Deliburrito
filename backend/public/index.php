@@ -417,12 +417,13 @@ function handleCreateOrder($db) {
     $order_id = $stmt->insert_id;
 
     foreach ($items as $item) {
-        $product_type = $item['product_type'] ?? 'burrito';
-        $item_total = (float)($item['item_total'] ?? 0);
-        $notes = $item['notes'] ?? '';
+        $product_type   = $item['product_type'] ?? 'burrito';
+        $variation_name = $item['variation_name'] ?? null;
+        $item_total     = (float)($item['item_total'] ?? 0);
+        $notes          = $item['notes'] ?? '';
 
-        $stmt2 = $db->prepare("INSERT INTO order_items (order_id, product_type, item_total, notes) VALUES (?, ?, ?, ?)");
-        $stmt2->bind_param('isds', $order_id, $product_type, $item_total, $notes);
+        $stmt2 = $db->prepare("INSERT INTO order_items (order_id, product_type, variation_name, item_total, notes) VALUES (?, ?, ?, ?, ?)");
+        $stmt2->bind_param('issds', $order_id, $product_type, $variation_name, $item_total, $notes);
         $stmt2->execute();
         $item_id = $stmt2->insert_id;
 
@@ -450,11 +451,11 @@ function handleListOrders($db) {
     $result = $db->query("SELECT * FROM orders ORDER BY created_at DESC LIMIT 50");
     $orders = [];
     while ($row = $result->fetch_assoc()) {
-        $items = $db->query("SELECT id, product_type, item_total, notes FROM order_items WHERE order_id = ".$row['id'])->fetch_all(MYSQLI_ASSOC);
+        $items = $db->query("SELECT id, product_type, variation_name, item_total, notes FROM order_items WHERE order_id = ".$row['id'])->fetch_all(MYSQLI_ASSOC);
         foreach($items as &$item) {
             $item['options'] = $db->query("SELECT o.name FROM order_item_options oio JOIN options o ON oio.option_id = o.id WHERE oio.order_item_id = ".$item['id'])->fetch_all(MYSQLI_ASSOC);
         }
-        unset($item); // Clear reference
+        unset($item);
         $row['items'] = $items;
         $orders[] = $row;
     }
@@ -479,7 +480,7 @@ function handlePendientizeOrder($db, $id) {
 function handlePrintOrder($db, $id) {
     header('Content-Type: text/html; charset=utf-8');
     $order = $db->query("SELECT * FROM orders WHERE id = $id")->fetch_assoc();
-    $itemsResult = $db->query("SELECT oi.id, oi.product_type, oi.item_total FROM order_items oi WHERE oi.order_id = $id");
+    $itemsResult = $db->query("SELECT oi.id, oi.product_type, oi.variation_name, oi.item_total FROM order_items oi WHERE oi.order_id = $id");
     $items = [];
     while ($item = $itemsResult->fetch_assoc()) {
         $optsResult = $db->query("SELECT opt.name FROM order_item_options oio JOIN options opt ON oio.option_id = opt.id WHERE oio.order_item_id = " . (int)$item['id']);
@@ -500,59 +501,131 @@ function handlePrintOrder($db, $id) {
         <script src='https://cdn.tailwindcss.com'></script>
         <link href='https://fonts.googleapis.com/css2?family=Outfit:wght@400;700;900&display=swap' rel='stylesheet'>
         <style>
-            body { font-family: 'monospace'; line-height: 1.1; }
+            body {
+                font-family: 'Outfit', monospace;
+                line-height: 1.2;
+                background: #f3f4f6;
+            }
+
+            /* ── Vista previa en pantalla ── */
+            #zona-impresion {
+                width: 76mm;
+                background: white;
+                padding: 4mm;
+                margin: 0 auto;
+            }
+
+            /* ── Impresión: hoja carta horizontal dividida en 3 tercios ── */
             @media print {
-                @page { margin: 0; }
-                body { margin: 0; padding: 0; width: 80mm; visibility: hidden; }
-                #zona-impresion, #zona-impresion * { visibility: visible; }
-                #zona-impresion { 
+                /* 1. Ocultar todo el contenido de la UI */
+                body * {
+                    visibility: hidden;
+                }
+
+                /* 2. Matar cualquier centrado (flex/grid) del root/body */
+                html, body, #root, #app {
+                    width: 100%;
+                    height: 100%;
+                    margin: 0 !important;
+                    padding: 0 !important;
+                    display: block !important;
+                    background: white !important;
+                }
+
+                /* 3. Hoja sin márgenes — evita 2da página en blanco y oculta textos del navegador */
+                @page {
+                    size: letter landscape;
+                    margin: 0;
+                }
+
+                /* 4. Mostrar solo la comanda anclada a la esquina superior izquierda */
+                #zona-impresion,
+                #zona-impresion * {
+                    visibility: visible;
+                }
+
+                #zona-impresion {
                     position: absolute;
                     left: 0;
                     top: 0;
-                    width: 76mm; 
-                    margin: 0;
-                    padding: 2mm;
+                    width: 100vw;
+                    height: 100vh;
+                    margin: 0 !important;
+                    padding: 8mm 15mm !important; /* margen interno de seguridad */
+
+                    /* 3 columnas = 3 tercios horizontales para cortar */
+                    column-count: 3;
+                    column-gap: 15mm;
+                    column-fill: auto;
+                    column-rule: 1px dashed #bbb;
+
+                    display: block !important;
+                    text-align: left;
+                    transform: none !important;
+                    background: white;
+                }
+
+                /* 5. Evitar cortes feos a la mitad de un ingrediente */
+                .no-cortar {
+                    break-inside: avoid;
+                    page-break-inside: avoid;
+                }
+
+                /* 6. Forzar impresión de fondos y colores */
+                * {
+                    -webkit-print-color-adjust: exact !important;
+                    print-color-adjust: exact !important;
+                    color-adjust: exact !important;
                 }
             }
         </style>
     </head>
-    <body class='bg-gray-100 p-0' onload='window.print()'>
-        <div id='zona-impresion' class='w-[76mm] bg-white text-black p-2 font-mono text-xs mx-auto print:border-none'>
-            
-            <!-- --- ENCABEZADO --- -->
-            <div class='text-center border-b border-black pb-1 mb-2'>
-                <h1 class='font-black text-xl uppercase tracking-widest leading-none'>Deli Burrito</h1>
-                <h2 class='font-bold text-lg tracking-tighter uppercase'>Ticket #$id</h2>
-                <p class='text-[9px] font-bold'>$fecha - $hora</p>
+    <body class='p-4' onload='window.print()'>
+        <div id='zona-impresion' class='text-black text-xs font-mono'>
+
+            <!-- ENCABEZADO -->
+            <div class='no-cortar text-center border-b-2 border-black pb-2 mb-2'>
+                <p class='font-black text-base uppercase tracking-widest leading-none'>Deli Burrito</p>
+                <p class='font-bold text-sm tracking-tighter uppercase'>Comanda #$id</p>
+                <p class='text-[9px] font-bold mt-0.5'>$fecha &nbsp;·&nbsp; $hora</p>
             </div>
 
-            <!-- --- DATOS DEL CLIENTE --- -->
-            <div class='border-b border-dashed border-black pb-1 mb-2 space-y-0.5 text-[10px]'>
-                <p><span class='font-bold uppercase bg-black text-white px-1'>Cliente:</span> {$order['customer_name']}</p>
-                <p><span class='font-bold uppercase'>Tel:</span> {$order['customer_phone']}</p>
-                <p><span class='font-bold uppercase'>Dir:</span> " . ($order['customer_address'] ?: 'RECOGE EN LOCAL') . "</p>
+            <!-- DATOS DEL CLIENTE -->
+            <div class='no-cortar border-b border-dashed border-black pb-2 mb-2 space-y-0.5 text-[10px]'>
+                <div style='display:flex;justify-content:space-between;align-items:flex-start;'>
+                    <div class='space-y-0.5'>
+                        <p><span class='font-black uppercase bg-black text-white px-1 mr-1'>Cliente</span>{$order['customer_name']}</p>
+                        <p><span class='font-black uppercase'>Tel:</span> {$order['customer_phone']}</p>
+                        <p><span class='font-black uppercase'>Dir:</span> " . ($order['customer_address'] ?: 'RECOGE EN LOCAL') . "</p>
+                        <p><span class='font-black uppercase'>Entrega:</span> " . strtoupper($order['delivery_type']) . "</p>
+                    </div>
+                    <div style='text-align:right;'>
+                        <p style='font-size:9px;font-weight:900;text-transform:uppercase;color:#555;'>Total</p>
+                        <p style='font-size:16px;font-weight:900;line-height:1;'>\$" . number_format($order['total']) . "</p>
+                    </div>
+                </div>
             </div>
 
-            <!-- --- DETALLE DEL PEDIDO --- -->
+            <!-- DETALLE DEL PEDIDO -->
             <div class='border-b border-black pb-2 mb-2'>
-                <h3 class='font-bold text-center mb-2 uppercase underline decoration-1 underline-offset-2 text-xs'>Preparación</h3>
+                <p class='font-black text-center mb-2 uppercase underline underline-offset-2 text-[10px] tracking-widest'>Preparación</p>
                 ";
 
     foreach ($items as $item) {
-        $productName = strtoupper($item['product_type']);
+        $productName    = strtoupper($item['product_type']);
+        $variationLabel = !empty($item['variation_name'])
+            ? ' — ' . strtoupper($item['variation_name'])
+            : '';
         echo "
-                <div class='mb-3'>
-                    <div class='bg-black text-white font-black text-sm p-0.5 px-1 uppercase flex justify-between'>
-                        <span>1x $productName</span>
+                <div class='no-cortar mb-2'>
+                    <div style='background:#000;color:#fff;font-weight:900;font-size:11px;padding:3px 6px;text-transform:uppercase;letter-spacing:0.05em;'>
+                        1x {$productName}{$variationLabel}
                     </div>
-                    <ul class='mt-1 space-y-0.5 text-[12px] font-bold pl-1'>
+                    <ul class='mt-1 space-y-0.5 text-[11px] font-bold pl-2'>
         ";
         foreach ($item['options'] as $opt) {
             echo "
-                        <li class='flex items-start'>
-                            <span class='mr-1'>-</span>
-                            <span>{$opt['name']}</span>
-                        </li>
+                        <li>— {$opt['name']}</li>
             ";
         }
         echo "
@@ -564,12 +637,11 @@ function handlePrintOrder($db, $id) {
     echo "
             </div>
 
-            <!-- --- TOTAL --- -->
-            <div class='text-right'>
-                <p class='font-black text-lg'>TOTAL: $" . number_format($order['total']) . "</p>
+            <!-- TOTAL -->
+            <div class='no-cortar text-right'>
+                <p class='font-black text-base'>TOTAL: \$" . number_format($order['total']) . "</p>
             </div>
-            
-            <div class='h-4'></div>
+
         </div>
     </body>
     </html>";

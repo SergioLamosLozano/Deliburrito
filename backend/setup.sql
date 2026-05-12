@@ -61,6 +61,7 @@ CREATE TABLE IF NOT EXISTS `order_items` (
     `id` BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     `order_id` BIGINT UNSIGNED NOT NULL,
     `product_type` VARCHAR(255) DEFAULT 'burrito',
+    `variation_name` VARCHAR(100) NULL,
     `item_total` DECIMAL(10,2) DEFAULT 0,
     `notes` TEXT,
     `created_at` TIMESTAMP NULL,

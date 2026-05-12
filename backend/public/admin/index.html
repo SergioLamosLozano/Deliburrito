@@ -3,6 +3,9 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, max-age=0" />
+  <meta http-equiv="Pragma" content="no-cache" />
+  <meta http-equiv="Expires" content="0" />
   <title>Admin Dashboard - Deli Burrito</title>
   <link rel="icon" type="image/x-icon" href="/deliburrito.ico" />
   <script src="https://cdn.tailwindcss.com"></script>
@@ -193,6 +196,8 @@
     let currentOrderTab = 'pendiente';
     let currentDateFilter = 'today';
     let dataCache = { orders: [], categories: [], options: [], variations: [] };
+    // Inicializar en el pasado para que el primer auto-refresh dispare de inmediato
+    let lastUpdate = new Date(0);
     const money = (val) => new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(val);
 
     const timeAgo = (dateStr) => {
@@ -209,6 +214,64 @@
         const h = Math.floor(diff / 3600);
         return h === 1 ? '1 hora' : `${h} horas`;
     };
+
+    // ── Semáforo de tiempo ────────────────────────────────────────────────
+    // Devuelve minutos transcurridos desde una fecha MySQL ("YYYY-MM-DD HH:MM:SS")
+    function getElapsedMinutes(dateStr) {
+        if (!dateStr) return 0;
+        const local = dateStr.replace(' ', 'T');
+        const diff = Math.floor((new Date() - new Date(local)) / 1000);
+        return Math.floor(diff / 60);
+    }
+
+    // Devuelve clases Tailwind + emoji + label según los minutos transcurridos
+    function getTrafficLight(minutes) {
+        if (minutes >= 1440) {             // 24 h+
+            const days  = Math.floor(minutes / 1440);
+            const hours = Math.floor((minutes % 1440) / 60);
+            const label = days === 1
+                ? (hours > 0 ? `Hace 1 día y ${hours}h` : 'Hace 1 día')
+                : `Hace ${days} días`;
+            return { bg: 'bg-blue-100', text: 'text-blue-700', dot: 'bg-blue-400', label: `📦 ${label}` };
+        }
+        if (minutes < 12) return {
+            bg:    'bg-green-100',
+            text:  'text-green-800',
+            dot:   'bg-green-500',
+            label: minutes <= 1 ? 'Recién aceptado' : `Hace ${minutes} min`,
+        };
+        if (minutes < 20) return {
+            bg:    'bg-yellow-100',
+            text:  'text-yellow-800',
+            dot:   'bg-yellow-500',
+            label: `Hace ${minutes} min`,
+        };
+        return {
+            bg:    'bg-red-100',
+            text:  'text-red-700',
+            dot:   'bg-red-500',
+            label: `⚠️ ${minutes} min — URGENTE`,
+        };
+    }
+
+    // Actualiza en vivo todos los badges de semáforo sin re-renderizar la grilla
+    function tickTrafficLights() {
+        document.querySelectorAll('[data-accepted-at]').forEach(el => {
+            const dateStr = el.getAttribute('data-accepted-at');
+            const mins = getElapsedMinutes(dateStr);
+            const tl = getTrafficLight(mins);
+            // Actualizar clases de color
+            el.className = `flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wide ${tl.bg} ${tl.text}`;
+            // Actualizar texto (el dot es el primer hijo, el texto el segundo)
+            const dotEl  = el.querySelector('.tl-dot');
+            const txtEl  = el.querySelector('.tl-label');
+            if (dotEl) dotEl.className = `tl-dot w-2 h-2 rounded-full ${tl.dot}`;
+            if (txtEl) txtEl.textContent = tl.label;
+        });
+    }
+
+    // Arrancar el ticker global (cada 60 s)
+    setInterval(tickTrafficLights, 60000);
 
     window.showToast = (message, type = 'success') => {
         const id = Date.now();
@@ -384,9 +447,10 @@
         document.getElementById('statsCancelled').textContent= todayOrders.filter(o => o.status === 'cancelado').length;
 
         grid.innerHTML = filtered.map(order => {
-            const tiempoAceptado = order.status === 'aceptado'
-                ? timeAgo(order.updated_at || order.created_at)
-                : '';
+            const acceptedDate = order.status === 'aceptado' ? (order.updated_at || order.created_at) : null;
+            const mins = acceptedDate ? getElapsedMinutes(acceptedDate) : 0;
+            const tl   = acceptedDate ? getTrafficLight(mins) : null;
+
             return `
             <article onclick="viewOrderDetail(${order.id})" class="bg-white rounded-3xl shadow-sm border border-gray-100 p-6 hover:shadow-xl transition-all cursor-pointer group animate-in fade-in duration-500">
                 <div class="flex justify-between items-start mb-4">
@@ -404,7 +468,10 @@
                 <div class="bg-gray-50 rounded-2xl p-4 mb-4">
                     ${order.items.map(item => `
                         <div class="flex justify-between items-center py-1 border-b last:border-0 border-gray-200">
-                            <span class="text-xs font-black text-gray-700 uppercase">${item.product_type}</span>
+                            <div class="flex items-center gap-2">
+                                <span class="text-xs font-black text-gray-700 uppercase">${item.product_type}</span>
+                                ${item.variation_name ? `<span class="px-1.5 py-0.5 bg-orange-100 text-orange-600 rounded text-[9px] font-black uppercase">${item.variation_name}</span>` : ''}
+                            </div>
                             <span class="text-[10px] text-gray-400 font-bold italic">${item.options.length} ingred.</span>
                         </div>
                     `).join('')}
@@ -426,9 +493,13 @@
                             ` : ''}
                             <button onclick="event.stopPropagation(); window.open('${apiBase}/index.php?route=orders/${order.id}/print')" class="p-3 bg-slate-800 text-white rounded-xl hover:bg-slate-900 transition-colors shadow-lg" title="Imprimir">🖨️</button>
                         </div>
-                        ${order.status === 'aceptado' ? `
-                            <span class="text-[10px] font-black text-green-600 bg-green-50 px-3 py-1.5 rounded-full uppercase tracking-wide">
-                                Aceptado hace ${tiempoAceptado}
+                        ${tl ? `
+                            <span
+                                data-accepted-at="${acceptedDate}"
+                                class="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wide ${tl.bg} ${tl.text}"
+                            >
+                                <span class="tl-dot w-2 h-2 rounded-full ${tl.dot}"></span>
+                                <span class="tl-label">${tl.label}</span>
                             </span>
                         ` : ''}
                     </div>
@@ -942,7 +1013,10 @@
                 ${order.items.map(item => `
                     <div class="bg-white rounded-2xl p-4 border-2 border-gray-100 shadow-sm hover:border-red-200 transition-colors">
                         <div class="flex justify-between items-center mb-3 border-b-2 border-dashed border-gray-100 pb-2">
-                            <span class="text-lg font-black text-gray-800 uppercase tracking-tight">${item.product_type}</span>
+                            <div>
+                                <span class="text-lg font-black text-gray-800 uppercase tracking-tight">${item.product_type}</span>
+                                ${item.variation_name ? `<span class="ml-2 px-2 py-0.5 bg-orange-100 text-orange-700 rounded-full text-[10px] font-black uppercase tracking-wide">${item.variation_name}</span>` : ''}
+                            </div>
                             <span class="bg-red-600 text-white px-2 py-0.5 rounded-lg font-black text-[10px] uppercase">X1</span>
                         </div>
                         <ul class="space-y-2">
@@ -1087,7 +1161,7 @@
     setInterval(() => {
         const diff = Math.floor((new Date() - lastUpdate) / 1000);
         document.getElementById('updateTimer').textContent = `Actualizado hace: ${diff}s`;
-        if (diff > 30) loadViewData();
+        if (diff > 10) loadViewData();
     }, 1000);
 
     // Initial Load
