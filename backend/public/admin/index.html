@@ -394,11 +394,37 @@
     }
 
     async function loadViewData() {
-        const response = await fetch(`${apiBase}/index.php?route=${currentView === 'orders' ? 'orders' : currentView}`);
+        let url = `${apiBase}/index.php?route=${currentView === 'orders' ? 'orders' : currentView}`;
+        
+        // Solo para pedidos, y si ya tenemos un caché, pasamos el parámetro since
+        if (currentView === 'orders' && dataCache.orders.length > 0 && lastUpdate > new Date(0)) {
+            // Retrocedemos 5 segundos para compensar desfases de tiempo
+            const sinceDate = new Date(lastUpdate.getTime() - 5000);
+            
+            // Construir formato MySQL YYYY-MM-DD HH:MM:SS de manera segura (local)
+            const pad = n => n.toString().padStart(2, '0');
+            const sinceStr = `${sinceDate.getFullYear()}-${pad(sinceDate.getMonth()+1)}-${pad(sinceDate.getDate())} ${pad(sinceDate.getHours())}:${pad(sinceDate.getMinutes())}:${pad(sinceDate.getSeconds())}`;
+            
+            url += `&since=${encodeURIComponent(sinceStr)}`;
+        }
+
+        const response = await fetch(url);
         const data = await response.json();
         
         if (currentView === 'orders') {
-            dataCache.orders = data.orders || [];
+            if (dataCache.orders.length > 0 && data.orders) {
+                // Merge para no perder los pedidos que ya estaban
+                data.orders.forEach(no => {
+                    const idx = dataCache.orders.findIndex(o => o.id === no.id);
+                    if (idx !== -1) {
+                        dataCache.orders[idx] = no; // Actualizar existente
+                    } else {
+                        dataCache.orders.unshift(no); // Insertar nuevo
+                    }
+                });
+            } else {
+                dataCache.orders = data.orders || [];
+            }
             renderOrders();
             setOrderTab(currentOrderTab); // Refresh tab style
         } else if (currentView === 'categories') {

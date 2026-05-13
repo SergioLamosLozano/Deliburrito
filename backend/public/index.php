@@ -90,6 +90,12 @@ try {
         exit;
     }
 
+    // ── Laravel Sanctum dummy route (evita errores 404 en la consola) ──────
+    if ($method === 'GET' && $path === '/sanctum/csrf-cookie') {
+        echo json_encode(['ok' => true]);
+        exit;
+    }
+
     if ($method === 'POST' && $path === '/orders') {
         handleCreateOrder($db);
     } elseif ($method === 'GET' && $path === '/orders') {
@@ -448,7 +454,13 @@ function handleCreateOrder($db) {
 }
 
 function handleListOrders($db) {
-    $result = $db->query("SELECT * FROM orders ORDER BY created_at DESC LIMIT 50");
+    $sql = "SELECT * FROM orders";
+    if (!empty($_GET['since'])) {
+        $since = $db->real_escape_string($_GET['since']);
+        $sql .= " WHERE updated_at >= '$since' OR created_at >= '$since'";
+    }
+    $sql .= " ORDER BY created_at DESC" . (empty($_GET['since']) ? " LIMIT 500" : "");
+    $result = $db->query($sql);
     $orders = [];
     while ($row = $result->fetch_assoc()) {
         $items = $db->query("SELECT id, product_type, variation_name, item_total, notes FROM order_items WHERE order_id = ".$row['id'])->fetch_all(MYSQLI_ASSOC);
@@ -581,34 +593,34 @@ function handlePrintOrder($db, $id) {
         </style>
     </head>
     <body class='p-4' onload='window.print()'>
-        <div id='zona-impresion' class='text-black text-xs font-mono'>
+        <div id='zona-impresion' class='text-black font-mono'>
 
             <!-- ENCABEZADO -->
             <div class='no-cortar text-center border-b-2 border-black pb-2 mb-2'>
-                <p class='font-black text-base uppercase tracking-widest leading-none'>Deli Burrito</p>
-                <p class='font-bold text-sm tracking-tighter uppercase'>Comanda #$id</p>
-                <p class='text-[9px] font-bold mt-0.5'>$fecha &nbsp;·&nbsp; $hora</p>
+                <p style='font-size:20px;font-weight:900;text-transform:uppercase;letter-spacing:0.1em;line-height:1;'>Deli Burrito</p>
+                <p style='font-size:18px;font-weight:700;text-transform:uppercase;letter-spacing:-0.02em;'>Comanda #$id</p>
+                <p style='font-size:11px;font-weight:700;margin-top:2px;'>$fecha &nbsp;·&nbsp; $hora</p>
             </div>
 
             <!-- DATOS DEL CLIENTE -->
-            <div class='no-cortar border-b border-dashed border-black pb-2 mb-2 space-y-0.5 text-[10px]'>
+            <div class='no-cortar border-b border-dashed border-black pb-2 mb-2' style='font-size:13px;'>
                 <div style='display:flex;justify-content:space-between;align-items:flex-start;'>
-                    <div class='space-y-0.5'>
-                        <p><span class='font-black uppercase bg-black text-white px-1 mr-1'>Cliente</span>{$order['customer_name']}</p>
-                        <p><span class='font-black uppercase'>Tel:</span> {$order['customer_phone']}</p>
-                        <p><span class='font-black uppercase'>Dir:</span> " . ($order['customer_address'] ?: 'RECOGE EN LOCAL') . "</p>
-                        <p><span class='font-black uppercase'>Entrega:</span> " . strtoupper($order['delivery_type']) . "</p>
+                    <div style='line-height:1.5;'>
+                        <p><span style='font-weight:900;text-transform:uppercase;background:#000;color:#fff;padding:0 4px;margin-right:4px;'>Cliente</span>{$order['customer_name']}</p>
+                        <p><span style='font-weight:900;text-transform:uppercase;'>Tel:</span> {$order['customer_phone']}</p>
+                        <p><span style='font-weight:900;text-transform:uppercase;'>Dir:</span> " . ($order['customer_address'] ?: 'RECOGE EN LOCAL') . "</p>
+                        <p><span style='font-weight:900;text-transform:uppercase;'>Entrega:</span> " . strtoupper($order['delivery_type']) . "</p>
                     </div>
                     <div style='text-align:right;'>
-                        <p style='font-size:9px;font-weight:900;text-transform:uppercase;color:#555;'>Total</p>
-                        <p style='font-size:16px;font-weight:900;line-height:1;'>\$" . number_format($order['total']) . "</p>
+                        <p style='font-size:11px;font-weight:900;text-transform:uppercase;color:#555;'>Total</p>
+                        <p style='font-size:20px;font-weight:900;line-height:1;'>\$" . number_format($order['total']) . "</p>
                     </div>
                 </div>
             </div>
 
             <!-- DETALLE DEL PEDIDO -->
             <div class='border-b border-black pb-2 mb-2'>
-                <p class='font-black text-center mb-2 uppercase underline underline-offset-2 text-[10px] tracking-widest'>Preparación</p>
+                <p style='font-size:13px;font-weight:900;text-align:center;text-transform:uppercase;text-decoration:underline;text-underline-offset:2px;letter-spacing:0.1em;margin-bottom:6px;'>Preparación</p>
                 ";
 
     foreach ($items as $item) {
@@ -618,10 +630,10 @@ function handlePrintOrder($db, $id) {
             : '';
         echo "
                 <div class='no-cortar mb-2'>
-                    <div style='background:#000;color:#fff;font-weight:900;font-size:11px;padding:3px 6px;text-transform:uppercase;letter-spacing:0.05em;'>
+                    <div style='background:#000;color:#fff;font-weight:900;font-size:14px;padding:3px 6px;text-transform:uppercase;letter-spacing:0.05em;'>
                         1x {$productName}{$variationLabel}
                     </div>
-                    <ul class='mt-1 space-y-0.5 text-[11px] font-bold pl-2'>
+                    <ul style='margin-top:3px;font-size:14px;font-weight:700;padding-left:8px;line-height:1.5;'>
         ";
         foreach ($item['options'] as $opt) {
             echo "
@@ -638,8 +650,8 @@ function handlePrintOrder($db, $id) {
             </div>
 
             <!-- TOTAL -->
-            <div class='no-cortar text-right'>
-                <p class='font-black text-base'>TOTAL: \$" . number_format($order['total']) . "</p>
+            <div class='no-cortar' style='text-align:right;margin-top:4px;'>
+                <p style='font-size:20px;font-weight:900;'>TOTAL: \$" . number_format($order['total']) . "</p>
             </div>
 
         </div>
