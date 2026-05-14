@@ -56,13 +56,17 @@ export default function BurritoBuilder({ onCheckout, initialCart = [], showToast
     if (!productType) return [];
 
     if (productType === 'tortihamburguesa' && typeHasVariations) {
-      // Sin variación elegida → nada
       if (!selectedVariation) return [];
-      // Solo las que tienen explícitamente esta variación asignada
-      return categories.filter(cat => {
-        const deps = cat.variations ?? [];
-        return deps.some(v => v.id === selectedVariation.id);
-      });
+      return categories
+        .filter(cat => (cat.variations ?? []).some(v => v.id === selectedVariation.id))
+        .map(cat => {
+          const pivotVar = cat.variations.find(v => v.id === selectedVariation.id);
+          const override = pivotVar?.pivot?.max_selections;
+          if (override !== undefined && override !== null) {
+            return { ...cat, max_selections: Number(override) };
+          }
+          return cat;
+        });
     }
 
     // Burrito o tortihamburguesa sin variaciones → filtro normal por product_type
@@ -222,7 +226,7 @@ export default function BurritoBuilder({ onCheckout, initialCart = [], showToast
             <button onClick={() => handleSelectProductType('tortihamburguesa')}
               className="group bg-white p-8 rounded-[3rem] shadow-2xl hover:shadow-orange-200 transition-all border-4 border-gray-50 hover:border-orange-500 flex flex-col items-center text-center">
               <span className="text-8xl mb-6 transform group-hover:scale-110 transition-transform">🍔</span>
-              <h2 className="text-3xl font-black text-gray-800 uppercase tracking-tighter">Tortihambur</h2>
+              <h2 className="text-2xl sm:text-3xl font-black text-gray-800 uppercase tracking-tighter">Tortihamburguesa</h2>
               <p className="text-gray-400 font-bold mt-2 uppercase text-xs tracking-widest">El híbrido perfecto</p>
             </button>
           </div>
@@ -231,7 +235,7 @@ export default function BurritoBuilder({ onCheckout, initialCart = [], showToast
 
       {/* ── PANTALLA 2: Elegir variación ─────────────────────────────────── */}
       {showVariationSelector && (
-        <div className="relative z-10 max-w-2xl mx-auto p-6 flex flex-col items-center justify-center min-h-[calc(100vh-80px)]">
+        <div className="relative z-10 max-w-3xl mx-auto p-6 flex flex-col items-center justify-center min-h-[calc(100vh-80px)]">
 
           {/* Botón volver — mismo estilo que la casita del constructor */}
           <div className="w-full flex justify-start mb-8">
@@ -254,12 +258,22 @@ export default function BurritoBuilder({ onCheckout, initialCart = [], showToast
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 w-full">
             {activeVariations.map(v => (
               <button key={v.id} onClick={() => handleSelectVariation(v)}
-                className="group bg-white p-6 rounded-[2rem] shadow-xl hover:shadow-orange-200 transition-all border-4 border-gray-50 hover:border-orange-500 flex flex-col items-center text-center active:scale-95">
-                <span className="text-5xl mb-4 transform group-hover:scale-110 transition-transform">🍔</span>
+                className="group bg-white p-8 rounded-[2.5rem] shadow-xl hover:shadow-orange-200 transition-all border-4 border-gray-50 hover:border-orange-500 flex flex-col items-center text-center active:scale-95">
+                <span className="text-6xl mb-4 transform group-hover:scale-110 transition-transform">🍔</span>
                 <h2 className="text-xl font-black text-gray-800 uppercase tracking-tighter">{v.name}</h2>
                 <p className="text-orange-500 font-black mt-2 text-lg">
                   ${parseInt(v.base_price).toLocaleString()}
                 </p>
+                {v.description && (
+                  <div className="mt-4 pt-3 border-t border-gray-100 w-full group-hover:border-orange-200 transition-colors">
+                    <p className="text-[9px] font-black text-orange-500 uppercase tracking-[0.15em] mb-1">
+                      ✨ INGREDIENTES INCLUIDOS:
+                    </p>
+                    <p className="text-gray-600 text-[11px] font-bold leading-tight px-2 italic">
+                      {v.description}
+                    </p>
+                  </div>
+                )}
               </button>
             ))}
           </div>

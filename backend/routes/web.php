@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Admin\AuthController;
@@ -11,7 +11,7 @@ use App\Http\Controllers\Admin\SettingController;
 
 // ── Raíz ──────────────────────────────────────────────────────────────────
 Route::get('/', function () {
-    return 'Deli Burrito Backend';
+    return file_get_contents(public_path('index.html'));
 });
 
 // ── Endpoint para inicializar la cookie CSRF (necesario para el fetch de React) ──
@@ -23,6 +23,7 @@ Route::get('/sanctum/csrf-cookie', function () {
 Route::get('/menu',         [App\Http\Controllers\MenuController::class, 'index'])->name('menu.index');
 Route::get('/categories',   [App\Http\Controllers\MenuController::class, 'index']); // alias legacy
 Route::get('/public-config',[App\Http\Controllers\MenuController::class, 'publicConfig'])->name('public.config');
+Route::get('/variations',   [App\Http\Controllers\MenuController::class, 'variations'])->name('variations.index');
 
 // POST /orders con throttle: máximo 10 pedidos por minuto por IP
 Route::post('/orders', [App\Http\Controllers\OrderController::class, 'store'])

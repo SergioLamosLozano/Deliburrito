@@ -11,10 +11,12 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware) {
-        // Middlewares globales aplicados a todas las rutas web
         $middleware->web(append: [
-            \App\Http\Middleware\HandleInertiaRequests::class,
             \App\Http\Middleware\SecurityHeaders::class,
+        ]);
+
+        $middleware->validateCsrfTokens(except: [
+            '/orders',
         ]);
 
         // Alias disponibles para usar en rutas y grupos

@@ -23,6 +23,6 @@ class Category extends Model
      */
     public function variations()
     {
-        return $this->belongsToMany(ProductVariation::class, 'category_variation');
+        return $this->belongsToMany(ProductVariation::class, 'category_variation')->withPivot('max_selections');
     }
 }

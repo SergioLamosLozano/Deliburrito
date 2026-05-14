@@ -10,7 +10,7 @@ class MenuController extends Controller
 {
     public function index()
     {
-        $categories = Category::with(['options' => function($query) {
+        $categories = Category::with(['variations', 'options' => function($query) {
             $query->where('is_active', true);
         }])
         ->where('is_active', true)
@@ -29,5 +29,11 @@ class MenuController extends Controller
         $allowed  = ['costo_domicilio'];
         $settings = Setting::whereIn('key', $allowed)->get(['key', 'value']);
         return response()->json($settings);
+    }
+
+    public function variations()
+    {
+        $variations = \App\Models\ProductVariation::where('is_active', true)->get();
+        return response()->json($variations);
     }
 }

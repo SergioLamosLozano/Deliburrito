@@ -73,11 +73,12 @@
         
         <!-- View: Orders -->
         <div id="view-orders" class="view-content">
-          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-            <div class="bg-white p-6 rounded-3xl shadow-sm border border-gray-100"><p class="text-xs font-black text-gray-400 uppercase mb-1">Hoy</p><p id="statsTotal" class="text-3xl font-black">0</p></div>
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
+            <div class="bg-white p-6 rounded-3xl shadow-sm border border-gray-100"><p id="statsDateLabel" class="text-xs font-black text-gray-400 uppercase mb-1">Hoy</p><p id="statsTotal" class="text-3xl font-black">0</p></div>
             <div class="bg-white p-6 rounded-3xl shadow-sm border border-gray-100"><p class="text-xs font-black text-yellow-500 uppercase mb-1">Pendientes</p><p id="statsPending" class="text-3xl font-black">0</p></div>
             <div class="bg-white p-6 rounded-3xl shadow-sm border border-gray-100"><p class="text-xs font-black text-green-500 uppercase mb-1">Aceptados</p><p id="statsAccepted" class="text-3xl font-black">0</p></div>
             <div class="bg-white p-6 rounded-3xl shadow-sm border border-gray-100"><p class="text-xs font-black text-red-500 uppercase mb-1">Cancelados</p><p id="statsCancelled" class="text-3xl font-black">0</p></div>
+            <div class="bg-green-50 p-6 rounded-3xl shadow-sm border border-green-200 text-green-800"><p class="text-[10px] font-black uppercase mb-1 opacity-60">Recaudado (Ventas)</p><p id="statsRevenue" class="text-3xl font-black">$0</p></div>
           </div>
 
           <!-- TABS DE PEDIDOS -->
@@ -394,7 +395,7 @@
     }
 
     async function loadViewData() {
-        let url = `${apiBase}/index.php?route=${currentView === 'orders' ? 'orders' : currentView}`;
+        let url = `${apiBase}/admin-api.php?route=${currentView === 'orders' ? 'orders' : currentView}`;
         
         // Solo para pedidos, y si ya tenemos un caché, pasamos el parámetro since
         if (currentView === 'orders' && dataCache.orders.length > 0 && lastUpdate > new Date(0)) {
@@ -459,18 +460,39 @@
                 return db - da; // más reciente primero
               });
         
-        // Stats: solo contar pedidos de HOY
-        const todayStart = new Date();
-        todayStart.setHours(0, 0, 0, 0);
-        const todayOrders = allOrders.filter(o => {
-            if (!o.created_at) return false;
-            return new Date(o.created_at.replace(' ', 'T')) >= todayStart;
-        });
+        // Stats Dinámicas: dependen del filtro de fecha (Hoy/Ayer)
+        const now = new Date();
+        const tStart = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
+        const yStart = new Date(tStart); yStart.setDate(tStart.getDate() - 1);
 
-        document.getElementById('statsTotal').textContent    = todayOrders.length;
-        document.getElementById('statsPending').textContent  = todayOrders.filter(o => o.status === 'pendiente').length;
-        document.getElementById('statsAccepted').textContent = todayOrders.filter(o => o.status === 'aceptado').length;
-        document.getElementById('statsCancelled').textContent= todayOrders.filter(o => o.status === 'cancelado').length;
+        let statsOrders = [];
+        let labelText = 'Hoy';
+
+        if (currentDateFilter === 'yesterday') {
+            statsOrders = allOrders.filter(o => {
+                const d = new Date(o.created_at.replace(' ', 'T'));
+                return d >= yStart && d < tStart;
+            });
+            labelText = 'Ayer';
+        } else {
+            // Por defecto (hoy, semana, todos), mostramos estadísticas de HOY para control diario
+            statsOrders = allOrders.filter(o => {
+                if (!o.created_at) return false;
+                return new Date(o.created_at.replace(' ', 'T')) >= tStart;
+            });
+            labelText = 'Hoy';
+        }
+
+        document.getElementById('statsDateLabel').textContent = labelText;
+        document.getElementById('statsTotal').textContent    = statsOrders.length;
+        document.getElementById('statsPending').textContent  = statsOrders.filter(o => o.status === 'pendiente').length;
+        document.getElementById('statsAccepted').textContent = statsOrders.filter(o => o.status === 'aceptado').length;
+        document.getElementById('statsCancelled').textContent= statsOrders.filter(o => o.status === 'cancelado').length;
+
+        const revenue = statsOrders
+            .filter(o => o.status !== 'cancelado')
+            .reduce((acc, o) => acc + parseFloat(o.total), 0);
+        document.getElementById('statsRevenue').textContent = money(revenue);
 
         grid.innerHTML = filtered.map(order => {
             const acceptedDate = order.status === 'aceptado' ? (order.updated_at || order.created_at) : null;
@@ -517,7 +539,7 @@
                             ${order.status === 'aceptado' && order.customer_phone ? `
                                 <button onclick="event.stopPropagation(); sendWhatsApp(dataCache.orders.find(o=>o.id==${order.id}))" class="p-3 bg-green-100 text-green-700 rounded-xl hover:bg-green-200 transition-colors" title="Reenviar WhatsApp">💬</button>
                             ` : ''}
-                            <button onclick="event.stopPropagation(); window.open('${apiBase}/index.php?route=orders/${order.id}/print')" class="p-3 bg-slate-800 text-white rounded-xl hover:bg-slate-900 transition-colors shadow-lg" title="Imprimir">🖨️</button>
+                            <button onclick="event.stopPropagation(); window.open('${apiBase}/admin-api.php?route=orders/${order.id}/print')" class="p-3 bg-slate-800 text-white rounded-xl hover:bg-slate-900 transition-colors shadow-lg" title="Imprimir">🖨️</button>
                         </div>
                         ${tl ? `
                             <span
@@ -647,6 +669,12 @@
                 </div>
 
                 <div>
+                    <label class="block text-[10px] font-black text-gray-400 uppercase mb-1">Lo que incluye (ej: Cebolla, Tomate, Lechuga...)</label>
+                    <textarea name="description" placeholder="Describe los ingredientes que ya vienen por defecto..." 
+                        class="w-full p-4 bg-gray-50 rounded-2xl border-2 border-transparent focus:border-red-600 outline-none font-bold resize-none h-20">${v?.description || ''}</textarea>
+                </div>
+
+                <div>
                     <label class="block text-[10px] font-black text-gray-400 uppercase mb-1">Precio Base</label>
                     <div class="relative">
                         <span class="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 font-bold">$</span>
@@ -675,8 +703,8 @@
             data.is_active = formData.get('is_active') === 'on' ? 1 : 0;
             const id  = data.id;
             const url = id
-                ? `${apiBase}/index.php?route=variations/${id}`
-                : `${apiBase}/index.php?route=variations`;
+                ? `${apiBase}/admin-api.php?route=variations/${id}`
+                : `${apiBase}/admin-api.php?route=variations`;
 
             await fetch(url, {
                 method: 'POST',
@@ -694,14 +722,14 @@
     window.editVariation   = (v)  => openVariationModal(v);
 
     window.toggleVariation = async (id) => {
-        await fetch(`${apiBase}/index.php?route=variations/${id}/toggle`, { method: 'POST' });
+        await fetch(`${apiBase}/admin-api.php?route=variations/${id}/toggle`, { method: 'POST' });
         dataCache.variations = [];
         loadViewData();
     };
 
     window.deleteVariation = async (id) => {
         showConfirm('¿Eliminar esta variación? Las categorías que la usen perderán esa condición.', async () => {
-            await fetch(`${apiBase}/index.php?route=variations/${id}`, { method: 'DELETE' });
+            await fetch(`${apiBase}/admin-api.php?route=variations/${id}`, { method: 'DELETE' });
             showToast('Variación eliminada');
             dataCache.variations = [];
             loadViewData();
@@ -763,7 +791,7 @@
         // Asegurar que las variaciones estén cargadas para los checkboxes
         const doOpen = () => _openCategoryModalInner(cat);
         if (dataCache.variations.length === 0) {
-            fetch(`${apiBase}/index.php?route=variations`)
+            fetch(`${apiBase}/admin-api.php?route=variations`)
                 .then(r => r.json())
                 .then(data => { dataCache.variations = Array.isArray(data) ? data : []; doOpen(); })
                 .catch(doOpen);
@@ -806,19 +834,33 @@
                         ${targetLabels[target] ?? target}
                     </p>
                     <div class="space-y-2 pl-2">
-                        ${grouped[target].map(v => `
-                            <label class="flex items-center gap-3 cursor-pointer group">
-                                <input type="checkbox"
-                                    name="variation_ids"
-                                    value="${v.id}"
-                                    ${currentVariationIds.includes(v.id) ? 'checked' : ''}
-                                    class="w-4 h-4 rounded border-gray-300 accent-red-600">
-                                <span class="text-sm font-semibold text-gray-700 group-hover:text-red-600 transition-colors">
-                                    ${v.name}
-                                    ${parseFloat(v.base_price) > 0 ? `<span class="text-gray-400 text-xs ml-1 font-normal">${money(v.base_price)}</span>` : ''}
-                                </span>
-                            </label>
-                        `).join('')}
+                        ${grouped[target].map(v => {
+                            const pivot = (cat?.variations ?? []).find(pv => pv.id === v.id)?.pivot;
+                            const currentOverride = pivot?.max_selections ?? '';
+                            return `
+                            <div class="flex items-center justify-between group py-1">
+                                <label class="flex items-center gap-3 cursor-pointer">
+                                    <input type="checkbox"
+                                        name="variation_ids"
+                                        data-id="${v.id}"
+                                        ${currentVariationIds.includes(v.id) ? 'checked' : ''}
+                                        class="w-4 h-4 rounded border-gray-300 accent-red-600">
+                                    <span class="text-sm font-semibold text-gray-700 group-hover:text-red-600 transition-colors">
+                                        ${v.name}
+                                        ${parseFloat(v.base_price) > 0 ? `<span class="text-gray-400 text-xs ml-1 font-normal">${money(v.base_price)}</span>` : ''}
+                                    </span>
+                                </label>
+                                <div class="flex items-center gap-2">
+                                    <span class="text-[9px] font-bold text-gray-400 uppercase">Máx:</span>
+                                    <input type="number" 
+                                        name="variation_max_${v.id}" 
+                                        value="${currentOverride}" 
+                                        placeholder="Def."
+                                        class="w-12 p-1 bg-gray-50 border border-gray-200 rounded text-xs font-bold text-center focus:border-red-500 outline-none">
+                                </div>
+                            </div>
+                            `;
+                        }).join('')}
                     </div>
                 </div>
             `).join('');
@@ -912,11 +954,21 @@
             const data = Object.fromEntries(formData);
             data.is_required = formData.get('is_required') === 'on' ? 1 : 0;
             data.is_active   = formData.get('is_active')   === 'on' ? 1 : 0;
-            data.variation_ids = formData.getAll('variation_ids').map(Number);
+            
+            // Recoger configuración detallada de variaciones (ID + Máximo override)
+            const variationCheckboxes = e.target.querySelectorAll('input[name="variation_ids"]:checked');
+            data.variations_config = Array.from(variationCheckboxes).map(cb => {
+                const vid = cb.getAttribute('data-id');
+                const override = formData.get(`variation_max_${vid}`);
+                return {
+                    id: Number(vid),
+                    max_selections: (override !== '' && override !== null) ? Number(override) : null
+                };
+            });
             const id  = data.id;
             const url = id
-                ? `${apiBase}/index.php?route=categories/${id}`
-                : `${apiBase}/index.php?route=categories`;
+                ? `${apiBase}/admin-api.php?route=categories/${id}`
+                : `${apiBase}/admin-api.php?route=categories`;
             
             await fetch(url, {
                 method: 'POST',
@@ -976,7 +1028,7 @@
             const data = Object.fromEntries(formData);
             data.is_active = formData.get('is_active') === 'on' ? 1 : 0;
             const id = data.id;
-            const url = id ? `${apiBase}/index.php?route=options/${id}` : `${apiBase}/index.php?route=options`;
+            const url = id ? `${apiBase}/admin-api.php?route=options/${id}` : `${apiBase}/admin-api.php?route=options`;
             
             await fetch(url, { method: 'POST', body: JSON.stringify(data) });
             showToast(id ? 'Ingrediente actualizado' : 'Ingrediente creado');
@@ -1071,7 +1123,7 @@
                     ${order.status === 'aceptado' && order.customer_phone ? `
                         <button onclick="sendWhatsApp(dataCache.orders.find(o=>o.id==${order.id}))" class="flex-1 py-4 bg-green-100 text-green-700 rounded-2xl font-black hover:bg-green-200 transition-all uppercase tracking-widest text-xs">💬 REENVIAR WHATSAPP</button>
                     ` : ''}
-                    <button onclick="window.open('${apiBase}/index.php?route=orders/${order.id}/print')" class="flex-[2] py-4 bg-slate-800 text-white rounded-2xl font-black shadow-xl hover:bg-slate-900 transition-all uppercase tracking-widest text-sm transform hover:scale-[1.02] active:scale-95">🖨️ IMPRIMIR TICKET</button>
+                    <button onclick="window.open('${apiBase}/admin-api.php?route=orders/${order.id}/print')" class="flex-[2] py-4 bg-slate-800 text-white rounded-2xl font-black shadow-xl hover:bg-slate-900 transition-all uppercase tracking-widest text-sm transform hover:scale-[1.02] active:scale-95">🖨️ IMPRIMIR TICKET</button>
                     <button onclick="closeModal()" class="flex-1 py-4 bg-gray-100 text-gray-500 rounded-2xl font-black hover:bg-gray-200 transition-all uppercase tracking-widest text-xs">CERRAR</button>
                 `}
             </div>
@@ -1081,7 +1133,7 @@
 
     window.deleteCategory = async (id) => {
         showConfirm('¿Seguro? Si tiene ingredientes asociados, se desactivará en lugar de borrarse.', async () => {
-            await fetch(`${apiBase}/index.php?route=categories/${id}`, { method: 'DELETE' });
+            await fetch(`${apiBase}/admin-api.php?route=categories/${id}`, { method: 'DELETE' });
             showToast('Categoría procesada correctamente');
             loadViewData();
         });
@@ -1089,7 +1141,7 @@
     
     window.deleteOption = async (id) => {
         showConfirm('¿Borrar este ingrediente del menú?', async () => {
-            await fetch(`${apiBase}/index.php?route=options/${id}`, { method: 'DELETE' });
+            await fetch(`${apiBase}/admin-api.php?route=options/${id}`, { method: 'DELETE' });
             showToast('Ingrediente eliminado');
             loadViewData();
         });
@@ -1097,7 +1149,7 @@
 
     async function saveSettings() {
         const val = document.getElementById('costoDomicilioInput').value;
-        await fetch(`${apiBase}/index.php?route=settings`, {
+        await fetch(`${apiBase}/admin-api.php?route=settings`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ key: 'costo_domicilio', value: val })
@@ -1154,7 +1206,7 @@
         // "Sí" → aceptar + WhatsApp
         yesBtn.onclick = async () => {
             cleanUp();
-            await fetch(`${apiBase}/index.php?route=orders/${id}/aceptado`, { method: 'POST' });
+            await fetch(`${apiBase}/admin-api.php?route=orders/${id}/aceptado`, { method: 'POST' });
             showToast('Pedido confirmado ✓', 'success');
             if (order?.customer_phone) sendWhatsApp(order);
             loadViewData();
@@ -1164,7 +1216,7 @@
         noBtn.onclick = async () => {
             if (!order?.customer_phone) { cleanUp(); return; } // era el botón Cancelar
             cleanUp();
-            await fetch(`${apiBase}/index.php?route=orders/${id}/aceptado`, { method: 'POST' });
+            await fetch(`${apiBase}/admin-api.php?route=orders/${id}/aceptado`, { method: 'POST' });
             showToast('Pedido confirmado ✓', 'success');
             loadViewData();
         };
@@ -1177,7 +1229,7 @@
             return;
         }
         const order = dataCache.orders.find(o => o.id == id);
-        await fetch(`${apiBase}/index.php?route=orders/${id}/${status}`, { method: 'POST' });
+        await fetch(`${apiBase}/admin-api.php?route=orders/${id}/${status}`, { method: 'POST' });
         const msg = status === 'cancelado' ? 'Pedido cancelado' : 'Pedido reactivado';
         showToast(msg, status === 'cancelado' ? 'error' : 'success');
         loadViewData();
@@ -1193,7 +1245,7 @@
     // Initial Load
     document.addEventListener('DOMContentLoaded', () => {
         // Verificar sesion real contra el servidor
-        fetch('/index.php?route=admin-check', { credentials: 'include' })
+        fetch('/admin-api.php?route=admin-check', { credentials: 'include' })
             .then(r => r.json())
             .then(data => {
                 if (!data.authenticated) {
@@ -1211,7 +1263,7 @@
 
     document.getElementById('refreshBtn').onclick = loadViewData;
     document.getElementById('logoutBtn').onclick = () => {
-        fetch('/index.php?route=admin-logout', { method: 'POST', credentials: 'include' })
+        fetch('/admin-api.php?route=admin-logout', { method: 'POST', credentials: 'include' })
             .finally(() => {
                 sessionStorage.removeItem('deliburrito_admin_session');
                 window.location.href = '/admin/login/';
