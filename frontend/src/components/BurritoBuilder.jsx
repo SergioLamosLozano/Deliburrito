@@ -3,6 +3,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 export default function BurritoBuilder({ onCheckout, initialCart = [], showToast }) {
   const [categories,  setCategories]  = useState([]);
   const [variations,  setVariations]  = useState([]);
+  const [productTypes, setProductTypes] = useState([]);
   const [loading,     setLoading]     = useState(true);
 
   const [productType,       setProductType]       = useState(null);
@@ -11,15 +12,22 @@ export default function BurritoBuilder({ onCheckout, initialCart = [], showToast
   const [selection, setSelection] = useState({});
   const [cart,      setCart]      = useState(initialCart);
 
+  const productTypeData = useMemo(() => 
+    productTypes.find(t => t.slug === productType),
+    [productTypes, productType]
+  );
+
   // ── Carga inicial ────────────────────────────────────────────────────────
   useEffect(() => {
     Promise.all([
       fetch('/menu').then(r => r.json()),
       fetch('/variations').then(r => r.json()),
+      fetch('/product-types').then(r => r.json()),
     ])
-      .then(([menuData, varData]) => {
+      .then(([menuData, varData, typeData]) => {
         setCategories(menuData);
         setVariations(Array.isArray(varData) ? varData : []);
+        setProductTypes(Array.isArray(typeData) ? typeData : []);
         const init = {};
         menuData.forEach(cat => { init[cat.id] = cat.max_selections === 1 ? null : []; });
         setSelection(init);
@@ -55,7 +63,7 @@ export default function BurritoBuilder({ onCheckout, initialCart = [], showToast
   const filteredCategories = useMemo(() => {
     if (!productType) return [];
 
-    if (productType === 'tortihamburguesa' && typeHasVariations) {
+    if (typeHasVariations) {
       if (!selectedVariation) return [];
       return categories
         .filter(cat => (cat.variations ?? []).some(v => v.id === selectedVariation.id))
@@ -69,7 +77,7 @@ export default function BurritoBuilder({ onCheckout, initialCart = [], showToast
         });
     }
 
-    // Burrito o tortihamburguesa sin variaciones → filtro normal por product_type
+    // Sin variaciones → filtro normal por product_type
     return categories.filter(
       cat => cat.product_type === 'ambos' || cat.product_type === productType
     );
@@ -83,16 +91,31 @@ export default function BurritoBuilder({ onCheckout, initialCart = [], showToast
     filteredCategories.forEach(cat => {
       const sel = selection[cat.id];
       const items = Array.isArray(sel) ? sel : (sel ? [sel] : []);
-      items.forEach(item => { total += parseFloat(item.price_extra || 0); });
+      items.forEach(item => { total += parseFloat(item.price_extra || 0) * (item.quantity || 1); });
     });
     return total;
   };
   const currentTotal = calculateTotal();
+  
+  const resetBuilder = () => {
+    const init = {};
+    categories.forEach(cat => { init[cat.id] = cat.max_selections === 1 ? null : []; });
+    setSelection(init);
+    setStep(1);
+    setSelectedVariation(null);
+    setProductType(null);
+  };
 
   // ── Selección de opciones ────────────────────────────────────────────────
   const toggleSelection = (categoryId, option) => {
     const cat = filteredCategories.find(c => c.id === categoryId);
     if (!cat) return;
+
+    if (cat.allow_quantity == 1) {
+      updateQuantity(categoryId, option, 1);
+      return;
+    }
+
     if (cat.max_selections === 1) {
       setSelection(prev => ({ ...prev, [cat.id]: prev[cat.id]?.id === option.id ? null : option }));
     } else {
@@ -104,6 +127,26 @@ export default function BurritoBuilder({ onCheckout, initialCart = [], showToast
         return { ...prev, [cat.id]: [...current, option] };
       });
     }
+  };
+
+  const updateQuantity = (categoryId, option, delta) => {
+    setSelection(prev => {
+      const current = prev[categoryId] || [];
+      const item = current.find(o => o.id === option.id);
+      
+      if (!item) {
+        if (delta > 0) return { ...prev, [categoryId]: [...current, { ...option, quantity: 1 }] };
+        return prev;
+      }
+
+      const newQty = (item.quantity || 1) + delta;
+      if (newQty <= 0) return { ...prev, [categoryId]: current.filter(o => o.id !== option.id) };
+      
+      return {
+        ...prev,
+        [categoryId]: current.map(o => o.id === option.id ? { ...o, quantity: newQty } : o)
+      };
+    });
   };
 
   const isStepValid = () => {
@@ -122,11 +165,15 @@ export default function BurritoBuilder({ onCheckout, initialCart = [], showToast
     filteredCategories.forEach(cat => {
       const sel = selection[cat.id];
       const items = Array.isArray(sel) ? sel : (sel ? [sel] : []);
-      items.forEach(it => options.push({ option_id: it.id, is_primary: false }));
+      items.forEach(it => options.push({ 
+        option_id: it.id, 
+        quantity: it.quantity || 1,
+        is_primary: false 
+      }));
     });
 
     const varName = selectedVariation ? selectedVariation.name : '';
-    const displayName = productType === 'burrito' ? '🌯 Burrito' : `🍔 Torti ${varName}`.trim();
+    const displayName = `${productTypeData?.emoji || '🍔'} ${productTypeData?.name} ${varName}`.trim();
 
     setCart(prev => [...prev, {
       id: Date.now(),
@@ -141,13 +188,7 @@ export default function BurritoBuilder({ onCheckout, initialCart = [], showToast
         .map(o => categories.flatMap(c => c.options ?? []).find(op => op.id === o.option_id)?.name ?? '')
         .filter(Boolean).join(', '),
     }]);
-
-    const init = {};
-    categories.forEach(cat => { init[cat.id] = cat.max_selections === 1 ? null : []; });
-    setSelection(init);
-    setStep(1);
-    setProductType(null);
-    setSelectedVariation(null);
+    resetBuilder();
     showToast('¡Agregado al carrito!', 'success');
   };
 
@@ -156,14 +197,17 @@ export default function BurritoBuilder({ onCheckout, initialCart = [], showToast
     onCheckout(cart);
   };
 
-  const handleSelectProductType = (type) => { setProductType(type); setSelectedVariation(null); setStep(1); };
+  const handleSelectProductType = (type) => { 
+    resetBuilder();
+    setProductType(type); 
+  };
   const handleSelectVariation   = (v)    => { setSelectedVariation(v); setStep(1); };
 
   // Atrás desde el constructor: paso anterior → variación → inicio
   const handleBack = () => {
     if (step > 1) { setStep(step - 1); return; }
-    if (typeHasVariations) { setSelectedVariation(null); return; }
-    setProductType(null);
+    if (typeHasVariations && selectedVariation) { setSelectedVariation(null); return; }
+    resetBuilder();
   };
 
   if (loading) return (
@@ -173,7 +217,7 @@ export default function BurritoBuilder({ onCheckout, initialCart = [], showToast
   );
 
   const showTypeSelector      = !productType;
-  const showVariationSelector = productType === 'tortihamburguesa' && typeHasVariations && !selectedVariation;
+  const showVariationSelector = productType && typeHasVariations && !selectedVariation;
   const showBuilder           = productType && !showVariationSelector;
 
   return (
@@ -188,7 +232,7 @@ export default function BurritoBuilder({ onCheckout, initialCart = [], showToast
       <header className="bg-red-600 text-white sticky top-0 z-50 px-4 py-4 shadow-xl">
         <div className="max-w-6xl mx-auto flex justify-between items-center">
           <div className="cursor-pointer flex items-center gap-3"
-            onClick={() => { setProductType(null); setSelectedVariation(null); }}>
+            onClick={resetBuilder}>
             <img src="/deliburrito.webp" alt="Deli Burrito" className="h-16 w-auto" />
             <h1 className="text-2xl font-black italic tracking-tighter">
               DELI<span className="text-yellow-300">BURRITO</span>
@@ -209,26 +253,25 @@ export default function BurritoBuilder({ onCheckout, initialCart = [], showToast
 
       {/* ── PANTALLA 1: Elegir tipo ──────────────────────────────────────── */}
       {showTypeSelector && (
-        <div className="relative z-10 max-w-4xl mx-auto p-6 flex flex-col items-center justify-center min-h-[calc(100vh-80px)]">
+        <div className="relative z-10 max-w-6xl mx-auto p-6 flex flex-col items-center justify-center min-h-[calc(100vh-80px)]">
           <h1 className="text-3xl sm:text-5xl font-black text-red-600 mb-2 text-center uppercase tracking-tighter">
             ¿Qué te vas a armar hoy?
           </h1>
           <p className="text-gray-500 font-bold mb-10 text-center uppercase text-[10px] tracking-[0.2em]">
             Selecciona tu base preferida
           </p>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-8 w-full">
-            <button onClick={() => handleSelectProductType('burrito')}
-              className="group bg-white p-8 rounded-[3rem] shadow-2xl hover:shadow-red-200 transition-all border-4 border-gray-50 hover:border-red-500 flex flex-col items-center text-center">
-              <span className="text-8xl mb-6 transform group-hover:scale-110 transition-transform">🌯</span>
-              <h2 className="text-3xl font-black text-gray-800 uppercase tracking-tighter">Burrito</h2>
-              <p className="text-gray-400 font-bold mt-2 uppercase text-xs tracking-widest">La leyenda envuelta</p>
-            </button>
-            <button onClick={() => handleSelectProductType('tortihamburguesa')}
-              className="group bg-white p-8 rounded-[3rem] shadow-2xl hover:shadow-orange-200 transition-all border-4 border-gray-50 hover:border-orange-500 flex flex-col items-center text-center">
-              <span className="text-8xl mb-6 transform group-hover:scale-110 transition-transform">🍔</span>
-              <h2 className="text-2xl sm:text-3xl font-black text-gray-800 uppercase tracking-tighter">Tortihamburguesa</h2>
-              <p className="text-gray-400 font-bold mt-2 uppercase text-xs tracking-widest">El híbrido perfecto</p>
-            </button>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8 w-full">
+            {productTypes.map(t => (
+              <button key={t.slug} onClick={() => handleSelectProductType(t.slug)}
+                className="group bg-white p-8 rounded-[3rem] shadow-2xl hover:shadow-red-200 transition-all border-4 border-gray-50 hover:border-red-500 flex flex-col items-center text-center">
+                {t.image_path 
+                  ? <img src={t.image_path} className="w-24 h-24 sm:w-32 sm:h-32 object-cover rounded-[2rem] mb-4 sm:mb-6 transform group-hover:scale-110 transition-transform shadow-xl" alt={t.name} />
+                  : <span className="text-6xl sm:text-8xl mb-4 sm:mb-6 transform group-hover:scale-110 transition-transform">{t.emoji || '🍔'}</span>
+                }
+                <h2 className="text-sm sm:text-lg lg:text-xl font-black text-gray-800 uppercase tracking-tight leading-tight w-full px-2">{t.name}</h2>
+                <p className="text-gray-400 font-bold mt-2 uppercase text-[8px] sm:text-[9px] tracking-widest leading-tight px-2 sm:px-4">{t.description}</p>
+              </button>
+            ))}
           </div>
         </div>
       )}
@@ -247,9 +290,12 @@ export default function BurritoBuilder({ onCheckout, initialCart = [], showToast
             </button>
           </div>
 
-          <span className="text-7xl mb-4">🍔</span>
+          {productTypeData?.image_path 
+            ? <img src={productTypeData.image_path} className="w-24 h-24 object-cover rounded-[2rem] mb-4 shadow-xl" alt="" />
+            : <span className="text-7xl mb-4">{productTypeData?.emoji || '🍔'}</span>
+          }
           <h1 className="text-3xl sm:text-4xl font-black text-gray-800 mb-2 text-center uppercase tracking-tighter">
-            ¿Qué tipo de Tortihamburguesa?
+            ¿Qué tipo de {productTypes.find(t => t.slug === productType)?.name}?
           </h1>
           <p className="text-gray-400 font-bold mb-10 text-center uppercase text-[10px] tracking-[0.2em]">
             Elige tu variación para continuar
@@ -259,7 +305,10 @@ export default function BurritoBuilder({ onCheckout, initialCart = [], showToast
             {activeVariations.map(v => (
               <button key={v.id} onClick={() => handleSelectVariation(v)}
                 className="group bg-white p-8 rounded-[2.5rem] shadow-xl hover:shadow-orange-200 transition-all border-4 border-gray-50 hover:border-orange-500 flex flex-col items-center text-center active:scale-95">
-                <span className="text-6xl mb-4 transform group-hover:scale-110 transition-transform">🍔</span>
+                {productTypeData?.image_path 
+                  ? <img src={productTypeData.image_path} className="w-20 h-20 object-cover rounded-2xl mb-4 transform group-hover:scale-110 transition-transform shadow-lg" alt="" />
+                  : <span className="text-6xl mb-4 transform group-hover:scale-110 transition-transform">{productTypeData?.emoji || '🍔'}</span>
+                }
                 <h2 className="text-xl font-black text-gray-800 uppercase tracking-tighter">{v.name}</h2>
                 <p className="text-orange-500 font-black mt-2 text-lg">
                   ${parseInt(v.base_price).toLocaleString()}
@@ -387,34 +436,59 @@ export default function BurritoBuilder({ onCheckout, initialCart = [], showToast
                   )}
 
                   {(currentCategory.options ?? []).map(option => {
-                    const isSingle = currentCategory.max_selections === 1;
+                    const allowQty = currentCategory.allow_quantity == 1;
+                    const isSingle = currentCategory.max_selections === 1 && !allowQty;
+                    
+                    const sel = selection[currentCategory.id];
                     const isSelected = isSingle
-                      ? selection[currentCategory.id]?.id === option.id
-                      : (selection[currentCategory.id] || []).some(o => o.id === option.id);
+                      ? sel?.id === option.id
+                      : (sel || []).some(o => o.id === option.id);
+                    
+                    const item = (allowQty || !isSingle) 
+                      ? (Array.isArray(sel) ? sel.find(o => o.id === option.id) : null)
+                      : (isSelected ? sel : null);
+                    const quantity = item?.quantity || (isSelected ? 1 : 0);
 
                     return (
-                      <button key={option.id}
-                        onClick={() => toggleSelection(currentCategory.id, option)}
-                        className={`relative p-3 sm:p-4 rounded-3xl border-4 text-left transition-all group ${
-                          isSelected
-                            ? isSingle ? 'border-red-600 bg-red-50' : 'border-green-600 bg-green-50'
-                            : 'border-gray-100 bg-gray-50 hover:border-gray-200'
-                        }`}
-                      >
-                        <div className="flex flex-col h-full justify-between">
-                          <span className={`text-base font-bold leading-tight mb-2 ${isSelected ? 'text-gray-900' : 'text-gray-700'}`}>
-                            {option.name}
-                          </span>
-                          <span className={`font-black text-sm ${isSelected ? 'text-red-600' : 'text-gray-400'}`}>
-                            {parseFloat(option.price_extra) > 0
-                              ? `+${parseInt(option.price_extra).toLocaleString()}`
-                              : 'GRATIS'}
-                          </span>
-                        </div>
-                        {isSelected && (
+                      <div key={option.id} className="relative group">
+                        <button
+                          onClick={() => toggleSelection(currentCategory.id, option)}
+                          className={`w-full p-3 sm:p-4 rounded-3xl border-4 text-left transition-all min-h-[90px] flex items-center ${
+                            isSelected
+                              ? isSingle ? 'border-red-600 bg-red-50' : 'border-green-600 bg-green-50'
+                              : 'border-gray-100 bg-gray-50 hover:border-gray-200'
+                          }`}
+                        >
+                          <div className="flex flex-col h-full justify-center pr-10">
+                            <span className={`text-base font-bold leading-tight mb-1 ${isSelected ? 'text-gray-900' : 'text-gray-700'}`}>
+                              {option.name}
+                            </span>
+                            <span className={`font-black text-sm ${isSelected ? 'text-red-600' : 'text-gray-400'}`}>
+                              {parseFloat(option.price_extra) > 0
+                                ? `+${parseInt(option.price_extra).toLocaleString()}`
+                                : 'GRATIS'}
+                            </span>
+                          </div>
+                        </button>
+                        
+                        {allowQty && isSelected && (
+                          <div className="absolute top-1/2 -translate-y-1/2 right-1.5 flex flex-col items-center gap-0.5 bg-white rounded-xl shadow-lg border border-gray-100 p-0.5 z-10">
+                             <button 
+                               onClick={(e) => { e.stopPropagation(); updateQuantity(currentCategory.id, option, 1); }}
+                               className="w-6 h-6 rounded-lg bg-gray-50 hover:bg-green-100 text-green-600 flex items-center justify-center font-black transition-colors text-[10px]"
+                             >+</button>
+                             <span className="h-4 flex items-center justify-center font-black text-[9px] text-gray-800">{quantity}</span>
+                             <button 
+                               onClick={(e) => { e.stopPropagation(); updateQuantity(currentCategory.id, option, -1); }}
+                               className="w-6 h-6 rounded-lg bg-gray-50 hover:bg-red-100 text-red-600 flex items-center justify-center font-black transition-colors text-[10px]"
+                             >-</button>
+                          </div>
+                        )}
+                        
+                        {isSelected && !allowQty && (
                           <div className={`absolute -top-2 -right-2 w-7 h-7 rounded-full flex items-center justify-center text-white text-xs shadow-lg ${isSingle ? 'bg-red-600' : 'bg-green-600'}`}>✓</div>
                         )}
-                      </button>
+                      </div>
                     );
                   })}
                 </div>
@@ -443,9 +517,12 @@ export default function BurritoBuilder({ onCheckout, initialCart = [], showToast
               <div className="bg-white p-6 rounded-[2.5rem] shadow-xl border-4 border-yellow-400 sticky top-24">
                 <div className="flex justify-between items-center mb-4">
                   <h3 className="text-xl font-black uppercase tracking-tighter">
-                    {productType === 'burrito' ? 'Tu Burrito' : 'Tu Torti'}
+                    {productTypeData?.name || 'Tu Pedido'}
                   </h3>
-                  <span className="text-2xl">{productType === 'burrito' ? '🌯' : '🍔'}</span>
+                  {productTypeData?.image_path 
+                    ? <img src={productTypeData.image_path} className="w-10 h-10 object-cover rounded-xl shadow-sm" alt="" />
+                    : <span className="text-2xl">{productTypeData?.emoji || '🍔'}</span>
+                  }
                 </div>
 
                 <div className="space-y-3 mb-6 max-h-[30vh] overflow-y-auto pr-2 custom-scrollbar">
@@ -460,9 +537,11 @@ export default function BurritoBuilder({ onCheckout, initialCart = [], showToast
                     const items = Array.isArray(sel) ? sel : (sel ? [sel] : []);
                     return items.map(it => (
                       <div key={it.id} className="flex justify-between text-xs font-bold">
-                        <span className="text-gray-400 uppercase">{it.name}</span>
+                        <span className="text-gray-400 uppercase">
+                          {it.quantity > 1 ? `(${it.quantity}) ` : ''}{it.name}
+                        </span>
                         {(parseFloat(it.price_extra) || 0) > 0 && (
-                          <span className="text-green-600">+${parseInt(it.price_extra).toLocaleString()}</span>
+                          <span className="text-green-600">+${parseInt(it.price_extra * (it.quantity || 1)).toLocaleString()}</span>
                         )}
                       </div>
                     ));

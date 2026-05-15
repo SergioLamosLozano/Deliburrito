@@ -23,7 +23,7 @@ class OrderController extends Controller
                 'customer_address' => 'nullable|string|max:1000',
                 'delivery_type'    => 'required|in:domicilio,local,recoger',
                 'items'            => 'required|array|min:1|max:20',
-                'items.*.product_type' => 'required|string|in:burrito,tortihamburguesa',
+                'items.*.product_type' => 'required|string|max:100',
                 'items.*.variation_name' => 'nullable|string|max:255',
                 'items.*.notes'    => 'nullable|string|max:500',
                 'items.*.options'  => 'required|array',
@@ -65,6 +65,7 @@ class OrderController extends Controller
                         OrderItemOption::create([
                             'order_item_id' => $orderItem->id,
                             'option_id' => $optPayload['option_id'],
+                            'quantity'  => $optPayload['quantity'] ?? 1,
                             'price_charged' => 0,
                         ]);
                     }

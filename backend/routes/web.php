@@ -24,6 +24,7 @@ Route::get('/menu',         [App\Http\Controllers\MenuController::class, 'index'
 Route::get('/categories',   [App\Http\Controllers\MenuController::class, 'index']); // alias legacy
 Route::get('/public-config',[App\Http\Controllers\MenuController::class, 'publicConfig'])->name('public.config');
 Route::get('/variations',   [App\Http\Controllers\MenuController::class, 'variations'])->name('variations.index');
+Route::get('/product-types',[App\Http\Controllers\MenuController::class, 'productTypes'])->name('product-types.index');
 
 // POST /orders con throttle: máximo 10 pedidos por minuto por IP
 Route::post('/orders', [App\Http\Controllers\OrderController::class, 'store'])

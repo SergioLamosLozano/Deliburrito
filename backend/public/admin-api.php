@@ -141,6 +141,16 @@ try {
         requireAdmin();
         if ($method === 'GET') handleListSettings($db);
         elseif ($method === 'POST') handleUpdateSetting($db);
+    } elseif ($path === '/product-types') {
+        if ($method === 'GET') handleListProductTypes($db);
+        elseif ($method === 'POST') { requireAdmin(); handleCreateProductType($db); }
+    } elseif ($path === '/product-types/upload') {
+        requireAdmin();
+        handleUploadProductImage();
+    } elseif (preg_match('/^\/product-types\/(\d+)$/', $path, $matches)) {
+        requireAdmin();
+        if ($method === 'POST' || $method === 'PUT') handleUpdateProductType($db, $matches[1]);
+        elseif ($method === 'DELETE') handleDeleteProductType($db, $matches[1]);
     } elseif ($path === '/reports') {
         requireAdmin();
         handleReports($db);
@@ -255,9 +265,10 @@ function handleCreateCategory($db) {
     $order   = (int)$data['order_index'];
     $type    = $data['product_type'];
     $active  = (int)($data['is_active'] ?? 1);
+    $allow_qty = (int)($data['allow_quantity'] ?? 0);
     
-    $stmt = $db->prepare("INSERT INTO categories (name, is_required, max_selections, order_index, product_type, is_active) VALUES (?, ?, ?, ?, ?, ?)");
-    $stmt->bind_param('siiisi', $name, $is_req, $max_sel, $order, $type, $active);
+    $stmt = $db->prepare("INSERT INTO categories (name, is_required, max_selections, order_index, product_type, is_active, allow_quantity) VALUES (?, ?, ?, ?, ?, ?, ?)");
+    $stmt->bind_param('siiisii', $name, $is_req, $max_sel, $order, $type, $active, $allow_qty);
     $stmt->execute();
     $category_id = $stmt->insert_id;
 
@@ -276,10 +287,11 @@ function handleUpdateCategory($db, $id) {
     $order   = (int)($data['order_index'] ?? 0);
     $type    = $data['product_type'] ?? 'burrito';
     $active  = (int)($data['is_active'] ?? 1);
+    $allow_qty = (int)($data['allow_quantity'] ?? 0);
     $id_int  = (int)$id;
 
-    $stmt = $db->prepare("UPDATE categories SET name=?, is_required=?, max_selections=?, order_index=?, product_type=?, is_active=? WHERE id=?");
-    $stmt->bind_param('siiisii', $name, $is_req, $max_sel, $order, $type, $active, $id_int);
+    $stmt = $db->prepare("UPDATE categories SET name=?, is_required=?, max_selections=?, order_index=?, product_type=?, is_active=?, allow_quantity=? WHERE id=?");
+    $stmt->bind_param('siiisiii', $name, $is_req, $max_sel, $order, $type, $active, $allow_qty, $id_int);
     $stmt->execute();
 
     // Sincronizar variaciones
@@ -310,6 +322,81 @@ function syncCategoryVariations($db, int $category_id, array $variations_config)
 function handleListVariations($db) {
     $result = $db->query("SELECT * FROM product_variations ORDER BY product_target, name");
     echo json_encode($result->fetch_all(MYSQLI_ASSOC));
+}
+
+function handleReports($db) {
+    $sql = "SELECT status, COUNT(*) as count, SUM(total) as total FROM orders GROUP BY status";
+    $result = $db->query($sql);
+    echo json_encode($result->fetch_all(MYSQLI_ASSOC));
+}
+
+// --- PRODUCT TYPE HANDLERS ---
+
+function handleListProductTypes($db) {
+    $result = $db->query("SELECT * FROM product_types ORDER BY order_index");
+    echo json_encode($result->fetch_all(MYSQLI_ASSOC));
+}
+
+function handleCreateProductType($db) {
+    $data = json_decode(file_get_contents('php://input'), true);
+    $name = $data['name'] ?? '';
+    $slug = $data['slug'] ?? '';
+    $desc = $data['description'] ?? '';
+    $emoji = $data['emoji'] ?? '🍔';
+    $img  = $data['image_path'] ?? null;
+    $order = (int)($data['order_index'] ?? 0);
+    $active = (int)($data['is_active'] ?? 1);
+
+    $stmt = $db->prepare("INSERT INTO product_types (name, slug, description, emoji, image_path, order_index, is_active, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), NOW())");
+    $stmt->bind_param('sssssii', $name, $slug, $desc, $emoji, $img, $order, $active);
+    $stmt->execute();
+    echo json_encode(['ok' => true, 'id' => $stmt->insert_id]);
+}
+
+function handleUpdateProductType($db, $id) {
+    $data = json_decode(file_get_contents('php://input'), true);
+    $name = $data['name'] ?? '';
+    $slug = $data['slug'] ?? '';
+    $desc = $data['description'] ?? '';
+    $emoji = $data['emoji'] ?? '🍔';
+    $img  = $data['image_path'] ?? null;
+    $order = (int)($data['order_index'] ?? 0);
+    $active = (int)($data['is_active'] ?? 1);
+    $id_int = (int)$id;
+
+    $stmt = $db->prepare("UPDATE product_types SET name=?, slug=?, description=?, emoji=?, image_path=?, order_index=?, is_active=?, updated_at=NOW() WHERE id=?");
+    $stmt->bind_param('sssssiii', $name, $slug, $desc, $emoji, $img, $order, $active, $id_int);
+    $stmt->execute();
+    echo json_encode(['ok' => true]);
+}
+
+function handleUploadProductImage() {
+    if (!isset($_FILES['image'])) {
+        echo json_encode(['ok' => false, 'message' => 'No file uploaded']);
+        return;
+    }
+    $file = $_FILES['image'];
+    $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
+    $allowed = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'];
+    if (!in_array($ext, $allowed)) {
+        echo json_encode(['ok' => false, 'message' => 'Invalid file type']);
+        return;
+    }
+    $filename = uniqid('prod_') . '.' . $ext;
+    $targetDir = __DIR__ . '/uploads/products/';
+    if (!is_dir($targetDir)) mkdir($targetDir, 0755, true);
+    $target = $targetDir . $filename;
+    
+    if (move_uploaded_file($file['tmp_name'], $target)) {
+        echo json_encode(['ok' => true, 'path' => '/uploads/products/' . $filename]);
+    } else {
+        echo json_encode(['ok' => false, 'message' => 'Failed to move uploaded file']);
+    }
+}
+
+function handleDeleteProductType($db, $id) {
+    $db->query("DELETE FROM product_types WHERE id = " . (int)$id);
+    echo json_encode(['ok' => true]);
 }
 
 function handleCreateVariation($db) {
@@ -451,9 +538,10 @@ function handleCreateOrder($db) {
             if ($optRes && $optData = $optRes->fetch_assoc()) {
                 $is_primary = !empty($opt['is_primary']);
                 $price = $is_primary ? (float)$optData['price_base'] : (float)$optData['price_extra'];
+                $qty = (int)($opt['quantity'] ?? 1);
                 
-                $stmt3 = $db->prepare("INSERT INTO order_item_options (order_item_id, option_id, price_charged) VALUES (?, ?, ?)");
-                $stmt3->bind_param('iid', $item_id, $option_id, $price);
+                $stmt3 = $db->prepare("INSERT INTO order_item_options (order_item_id, option_id, price_charged, quantity) VALUES (?, ?, ?, ?)");
+                $stmt3->bind_param('iidi', $item_id, $option_id, $price, $qty);
                 $stmt3->execute();
             }
         }
@@ -474,7 +562,7 @@ function handleListOrders($db) {
     while ($row = $result->fetch_assoc()) {
         $items = $db->query("SELECT id, product_type, variation_name, item_total, notes FROM order_items WHERE order_id = ".$row['id'])->fetch_all(MYSQLI_ASSOC);
         foreach($items as &$item) {
-            $item['options'] = $db->query("SELECT o.name FROM order_item_options oio JOIN options o ON oio.option_id = o.id WHERE oio.order_item_id = ".$item['id'])->fetch_all(MYSQLI_ASSOC);
+            $item['options'] = $db->query("SELECT o.name, oio.quantity FROM order_item_options oio JOIN options o ON oio.option_id = o.id WHERE oio.order_item_id = ".$item['id'])->fetch_all(MYSQLI_ASSOC);
         }
         unset($item);
         $row['items'] = $items;
@@ -504,7 +592,7 @@ function handlePrintOrder($db, $id) {
     $itemsResult = $db->query("SELECT oi.id, oi.product_type, oi.variation_name, oi.item_total FROM order_items oi WHERE oi.order_id = $id");
     $items = [];
     while ($item = $itemsResult->fetch_assoc()) {
-        $optsResult = $db->query("SELECT opt.name FROM order_item_options oio JOIN options opt ON oio.option_id = opt.id WHERE oio.order_item_id = " . (int)$item['id']);
+        $optsResult = $db->query("SELECT opt.name, oio.quantity FROM order_item_options oio JOIN options opt ON oio.option_id = opt.id WHERE oio.order_item_id = " . (int)$item['id']);
         $item['options'] = $optsResult->fetch_all(MYSQLI_ASSOC);
         $items[] = $item;
     }
@@ -529,70 +617,48 @@ function handlePrintOrder($db, $id) {
             }
 
             /* ── Vista previa en pantalla ── */
-            #zona-impresion {
-                width: 76mm;
-                background: white;
-                padding: 4mm;
-                margin: 0 auto;
+            body {
+                background: #f3f4f6;
+                display: flex;
+                justify-content: center;
+                padding: 20px;
+                margin: 0;
             }
 
-            /* ── Impresión: hoja carta horizontal dividida en 3 tercios ── */
+            #zona-impresion {
+                width: 80mm;
+                background: white;
+                padding: 4mm;
+                box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            }
+
+            /* ── Impresión: rollo térmico de 80mm ── */
             @media print {
-                /* 1. Ocultar todo el contenido de la UI */
-                body * {
-                    visibility: hidden;
-                }
-
-                /* 2. Matar cualquier centrado (flex/grid) del root/body */
-                html, body, #root, #app {
-                    width: 100%;
-                    height: 100%;
-                    margin: 0 !important;
-                    padding: 0 !important;
-                    display: block !important;
+                body {
                     background: white !important;
+                    padding: 0 !important;
+                    margin: 0 !important;
+                    display: block !important;
                 }
 
-                /* 3. Hoja sin márgenes — evita 2da página en blanco y oculta textos del navegador */
                 @page {
-                    size: letter landscape;
-                    margin: 0;
-                }
-
-                /* 4. Mostrar solo la comanda anclada a la esquina superior izquierda */
-                #zona-impresion,
-                #zona-impresion * {
-                    visibility: visible;
+                    size: 80mm auto; /* 80mm de ancho, alto automático */
+                    margin: 0; /* Sin márgenes para impresoras térmicas */
                 }
 
                 #zona-impresion {
-                    position: absolute;
-                    left: 0;
-                    top: 0;
-                    width: 100vw;
-                    height: 100vh;
-                    margin: 0 !important;
-                    padding: 8mm 15mm !important; /* margen interno de seguridad */
-
-                    /* 3 columnas = 3 tercios horizontales para cortar */
-                    column-count: 3;
-                    column-gap: 15mm;
-                    column-fill: auto;
-                    column-rule: 1px dashed #bbb;
-
-                    display: block !important;
-                    text-align: left;
-                    transform: none !important;
-                    background: white;
+                    width: 76mm !important; /* Ligeramente menor a 80 para evitar cortes en el borde */
+                    padding: 2mm !important;
+                    margin: 0 auto !important;
+                    box-shadow: none !important;
                 }
 
-                /* 5. Evitar cortes feos a la mitad de un ingrediente */
+                /* Evitar cortes feos a la mitad de un ingrediente */
                 .no-cortar {
                     break-inside: avoid;
                     page-break-inside: avoid;
                 }
 
-                /* 6. Forzar impresión de fondos y colores */
                 * {
                     -webkit-print-color-adjust: exact !important;
                     print-color-adjust: exact !important;
@@ -645,8 +711,9 @@ function handlePrintOrder($db, $id) {
                     <ul style='margin-top:3px;font-size:14px;font-weight:700;padding-left:8px;line-height:1.5;'>
         ";
         foreach ($item['options'] as $opt) {
+            $qLabel = ($opt['quantity'] > 1) ? " (x{$opt['quantity']})" : "";
             echo "
-                        <li>— {$opt['name']}</li>
+                        <li>— {$opt['name']}{$qLabel}</li>
             ";
         }
         echo "
@@ -681,9 +748,4 @@ function handleUpdateSetting($db) {
     $stmt->bind_param('ss', $data['value'], $data['key']);
     $stmt->execute();
     echo json_encode(['ok' => true]);
-}
-
-function handleReports($db) {
-    $total = $db->query("SELECT SUM(total) as t, COUNT(*) as c FROM orders WHERE status='aceptado'")->fetch_assoc();
-    echo json_encode(['revenue' => (float)$total['t'], 'count' => (int)$total['c']]);
 }

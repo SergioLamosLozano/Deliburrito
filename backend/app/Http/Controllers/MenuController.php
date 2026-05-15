@@ -36,4 +36,12 @@ class MenuController extends Controller
         $variations = \App\Models\ProductVariation::where('is_active', true)->get();
         return response()->json($variations);
     }
+
+    public function productTypes()
+    {
+        $types = \App\Models\ProductType::where('is_active', true)
+            ->orderBy('order_index')
+            ->get();
+        return response()->json($types);
+    }
 }

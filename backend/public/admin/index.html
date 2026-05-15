@@ -13,9 +13,30 @@
   <style>
     body { font-family: 'Outfit', sans-serif; }
     .nav-active { @apply bg-white/20 border-r-4 border-yellow-400; }
-    .custom-scrollbar::-webkit-scrollbar { width: 6px; }
-    .custom-scrollbar::-webkit-scrollbar-track { background: #f1f1f1; }
-    .custom-scrollbar::-webkit-scrollbar-thumb { background: #dc2626; border-radius: 10px; }
+    
+    /* Scrollbar Aesthetics */
+    .custom-scrollbar::-webkit-scrollbar { 
+        width: 10px; 
+    }
+    .custom-scrollbar::-webkit-scrollbar-track { 
+        background: transparent; 
+        margin: 20px 0; /* Aumentado para esquinas muy redondeadas */
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb { 
+        background-color: #cbd5e1; 
+        border-radius: 20px; 
+        border: 3px solid white; /* Espacio entre el scroll y el borde del modal */
+        background-clip: padding-box;
+    }
+    .custom-scrollbar:hover::-webkit-scrollbar-thumb {
+        background-color: #dc2626; 
+    }
+    
+    /* Firefox Support */
+    .custom-scrollbar {
+        scrollbar-width: thin;
+        scrollbar-color: #cbd5e1 transparent;
+    }
   </style>
 </head>
 <body class="bg-gray-50 min-h-screen text-gray-800">
@@ -35,8 +56,11 @@
         <button data-view="categories" class="nav-btn w-full flex items-center gap-3 px-6 py-4 rounded-2xl transition-all hover:bg-white/10 font-bold">
           <span class="text-xl">🗂️</span> Categorías
         </button>
+        <button data-view="product-types" class="nav-btn w-full flex items-center gap-3 px-6 py-4 rounded-2xl transition-all hover:bg-white/10 font-bold">
+          <span class="text-xl">🍔</span> Módulos de Comida
+        </button>
         <button data-view="variations" class="nav-btn w-full flex items-center gap-3 px-6 py-4 rounded-2xl transition-all hover:bg-white/10 font-bold">
-          <span class="text-xl">🎛️</span> Tipos de Producto
+          <span class="text-xl">🎛️</span> Variaciones de Producto
         </button>
         <button data-view="options" class="nav-btn w-full flex items-center gap-3 px-6 py-4 rounded-2xl transition-all hover:bg-white/10 font-bold">
           <span class="text-xl">🍕</span> Opciones / Precios
@@ -124,11 +148,11 @@
           </div>
         </div>
 
-        <!-- View: Variations (Tipos de Producto) -->
+        <!-- View: Variations -->
         <div id="view-variations" class="view-content hidden">
           <div class="flex justify-between items-center mb-8">
             <div>
-              <h3 class="text-2xl font-black">Tipos de Producto</h3>
+              <h3 class="text-2xl font-black">Variaciones de Producto</h3>
               <p class="text-gray-500">Variaciones con precio base propio (ej. Sencilla, Mixta, Doble)</p>
             </div>
             <button onclick="openVariationModal()" class="bg-red-600 text-white px-6 py-3 rounded-2xl font-black shadow-lg hover:bg-red-700 transition-all">+ NUEVA VARIACIÓN</button>
@@ -148,6 +172,18 @@
           <div id="optionsGroupedContainer" class="space-y-8">
             <!-- Grouped tables will be injected here -->
           </div>
+        </div>
+
+        <!-- View: Product Types -->
+        <div id="view-product-types" class="view-content hidden">
+          <div class="flex justify-between items-center mb-8">
+            <div>
+              <h3 class="text-2xl font-black">Módulos de Comida</h3>
+              <p class="text-gray-500">Define los productos principales (Burritos, Tortihamburguesas, etc.)</p>
+            </div>
+            <button onclick="openProductTypeModal()" class="bg-red-600 text-white px-6 py-3 rounded-2xl font-black shadow-lg hover:bg-red-700 transition-all">+ NUEVO MÓDULO</button>
+          </div>
+          <div id="productTypesContainer" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"></div>
         </div>
 
         <!-- View: Settings -->
@@ -196,7 +232,7 @@
     let currentView = 'orders';
     let currentOrderTab = 'pendiente';
     let currentDateFilter = 'today';
-    let dataCache = { orders: [], categories: [], options: [], variations: [] };
+    let dataCache = { orders: [], categories: [], options: [], variations: [], productTypes: [] };
     // Inicializar en el pasado para que el primer auto-refresh dispare de inmediato
     let lastUpdate = new Date(0);
     const money = (val) => new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(val);
@@ -216,7 +252,147 @@
         return h === 1 ? '1 hora' : `${h} horas`;
     };
 
-    // ── Semáforo de tiempo ────────────────────────────────────────────────
+    // ── PRODUCT TYPES ───────────────────────────────────────────────────
+    
+    function renderProductTypes() {
+        const container = document.getElementById('productTypesContainer');
+        container.innerHTML = dataCache.productTypes.map(type => `
+            <div class="bg-white p-6 rounded-[2.5rem] shadow-sm border border-gray-100 flex flex-col items-center text-center group hover:shadow-xl transition-all">
+                ${type.image_path 
+                    ? `<img src="${type.image_path}" class="w-20 h-20 object-cover rounded-2xl mb-4 transform group-hover:scale-110 transition-transform shadow-lg">` 
+                    : `<span class="text-6xl mb-4 transform group-hover:scale-110 transition-transform">${type.emoji || '🍔'}</span>`
+                }
+                <h4 class="text-xl font-black uppercase">${type.name}</h4>
+                <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">${type.slug}</p>
+                <p class="text-gray-500 text-sm mt-3 line-clamp-2">${type.description || ''}</p>
+                <div class="mt-6 flex gap-2 w-full">
+                    <button onclick='openProductTypeModal(${JSON.stringify(type).replace(/'/g, "&apos;")})' class="flex-1 py-3 bg-gray-100 text-gray-700 rounded-2xl font-bold text-xs hover:bg-gray-200 transition-all uppercase">Editar</button>
+                    <button onclick="deleteProductType(${type.id})" class="p-3 bg-red-50 text-red-600 rounded-2xl hover:bg-red-100 transition-all">🗑️</button>
+                </div>
+            </div>
+        `).join('');
+    }
+
+    function openProductTypeModal(type = null) {
+        const overlay = document.getElementById('modalOverlay');
+        const content = document.getElementById('modalContent');
+        
+        content.innerHTML = `
+            <div class="flex justify-between items-center mb-6">
+                <h3 class="text-2xl font-black uppercase">${type ? 'Editar Módulo' : 'Nuevo Módulo'}</h3>
+                <button onclick="closeModal()" class="text-gray-400 hover:text-gray-600 text-2xl">&times;</button>
+            </div>
+            <form id="productTypeForm" onsubmit="handleProductTypeSubmit(event)" class="space-y-4">
+                <input type="hidden" name="id" value="${type ? type.id : ''}">
+                <div>
+                    <label class="block text-xs font-black text-gray-400 uppercase mb-1">Nombre del Módulo</label>
+                    <input type="text" name="name" value="${type ? type.name : ''}" required class="w-full p-4 bg-gray-50 rounded-2xl border-2 border-transparent focus:border-red-600 outline-none transition-all font-bold" placeholder="Ej: Tacos, Salchipapas...">
+                </div>
+                <div>
+                    <label class="block text-xs font-black text-gray-400 uppercase mb-1">Slug (Identificador único)</label>
+                    <input type="text" name="slug" value="${type ? type.slug : ''}" required ${type ? 'readonly' : ''} class="w-full p-4 bg-gray-50 rounded-2xl border-2 border-transparent focus:border-red-600 outline-none transition-all font-bold font-mono" placeholder="ej: tacos">
+                    <p class="text-[9px] text-gray-400 mt-1 italic">Este nombre técnico se usa internamente para vincular ingredientes.</p>
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-black text-gray-400 uppercase mb-1">Emoji / Ícono</label>
+                        <input type="text" name="emoji" value="${type ? type.emoji : '🍔'}" class="w-full p-4 bg-gray-50 rounded-2xl border-2 border-transparent focus:border-red-600 outline-none transition-all font-bold text-center text-2xl">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-black text-gray-400 uppercase mb-1">Imagen (Opcional)</label>
+                        <div class="relative group h-16">
+                            <input type="file" id="typeImageInput" accept="image/*" class="hidden" onchange="document.getElementById('imageStatus').textContent = this.files[0].name">
+                            <button type="button" onclick="document.getElementById('typeImageInput').click()" class="w-full h-full p-4 bg-gray-50 rounded-2xl border-2 border-dashed border-gray-200 hover:border-red-400 transition-all font-black text-[10px] uppercase text-gray-400 flex flex-col items-center justify-center gap-0.5">
+                                📁 <span id="imageStatus">${type?.image_path ? 'Cambiar Imagen' : 'Subir Imagen'}</span>
+                            </button>
+                            <input type="hidden" name="image_path" id="imagePathHidden" value="${type ? (type.image_path || '') : ''}">
+                        </div>
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-xs font-black text-gray-400 uppercase mb-1">Orden</label>
+                    <input type="number" name="order_index" value="${type ? type.order_index : 0}" class="w-full p-4 bg-gray-50 rounded-2xl border-2 border-transparent focus:border-red-600 outline-none transition-all font-bold">
+                </div>
+                <div>
+                    <label class="block text-xs font-black text-gray-400 uppercase mb-1">Descripción</label>
+                    <textarea name="description" class="w-full p-4 bg-gray-50 rounded-2xl border-2 border-transparent focus:border-red-600 outline-none transition-all font-medium text-sm h-24" placeholder="Describe este tipo de comida...">${type ? type.description : ''}</textarea>
+                </div>
+                <div class="flex items-center gap-2 py-2">
+                    <input type="checkbox" name="is_active" id="type_active" ${(!type || type.is_active) ? 'checked' : ''} class="w-4 h-4 rounded border-gray-300 accent-red-600">
+                    <label for="type_active" class="text-sm font-bold text-gray-700 cursor-pointer">Módulo Activo (Visible para clientes)</label>
+                </div>
+                <button type="submit" class="w-full py-4 bg-red-600 text-white rounded-2xl font-black shadow-xl hover:bg-red-700 transition-all uppercase mt-4">Guardar Módulo</button>
+            </form>
+        `;
+        overlay.classList.remove('hidden');
+    }
+
+    async function handleProductTypeSubmit(e) {
+        e.preventDefault();
+        const form = e.target;
+        const fileInput = document.getElementById('typeImageInput');
+        const hiddenPath = document.getElementById('imagePathHidden');
+        
+        const saveBtn = form.querySelector('button[type="submit"]');
+        const originalText = saveBtn.textContent;
+        saveBtn.disabled = true;
+        saveBtn.textContent = 'SUBIENDO...';
+
+        try {
+            if (fileInput.files.length > 0) {
+                const upData = new FormData();
+                upData.append('image', fileInput.files[0]);
+                const upResp = await fetch(`${apiBase}/admin-api.php?route=product-types/upload`, {
+                    method: 'POST',
+                    body: upData
+                });
+                const upResult = await upResp.json();
+                if (upResult.ok) {
+                    hiddenPath.value = upResult.path;
+                } else {
+                    alert('Error subiendo imagen: ' + upResult.message);
+                    saveBtn.disabled = false;
+                    saveBtn.textContent = originalText;
+                    return;
+                }
+            }
+
+            const formData = new FormData(form);
+            const data = Object.fromEntries(formData);
+            data.is_active = formData.get('is_active') === 'on' ? 1 : 0;
+            const id = data.id;
+            const url = id 
+                ? `${apiBase}/admin-api.php?route=product-types/${id}`
+                : `${apiBase}/admin-api.php?route=product-types`;
+
+            await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+
+            showToast(id ? 'Módulo actualizado' : 'Módulo creado');
+            closeModal();
+            loadViewData();
+        } catch (err) {
+            console.error(err);
+            showToast('Error al guardar módulo', 'error');
+        } finally {
+            saveBtn.disabled = false;
+            saveBtn.textContent = originalText;
+        }
+    }
+
+    async function deleteProductType(id) {
+        if (!confirm('¿Estás seguro de eliminar este módulo? Los productos asociados podrían dejar de funcionar.')) return;
+        const response = await fetch(`${apiBase}/admin-api.php?route=product-types/${id}`, { method: 'DELETE' });
+        if (response.ok) {
+            showToast('Módulo eliminado');
+            loadViewData();
+        }
+    }
+
+    // ── CATEGORIES ───────────────────────────────────────────────────────
     // Devuelve minutos transcurridos desde una fecha MySQL ("YYYY-MM-DD HH:MM:SS")
     function getElapsedMinutes(dateStr) {
         if (!dateStr) return 0;
@@ -227,7 +403,7 @@
 
     // Devuelve clases Tailwind + emoji + label según los minutos transcurridos
     function getTrafficLight(minutes) {
-        if (minutes >= 1440) {             // 24 h+
+        if (minutes >= 1440) { // 24h+
             const days  = Math.floor(minutes / 1440);
             const hours = Math.floor((minutes % 1440) / 60);
             const label = days === 1
@@ -235,18 +411,32 @@
                 : `Hace ${days} días`;
             return { bg: 'bg-blue-100', text: 'text-blue-700', dot: 'bg-blue-400', label: `📦 ${label}` };
         }
+        
+        if (minutes >= 60) { // 1h - 24h
+            const h = Math.floor(minutes / 60);
+            const m = minutes % 60;
+            return {
+                bg:    'bg-red-100',
+                text:  'text-red-700',
+                dot:   'bg-red-500',
+                label: `⚠️ Hace ${h}h ${m}m`,
+            };
+        }
+
         if (minutes < 12) return {
             bg:    'bg-green-100',
             text:  'text-green-800',
             dot:   'bg-green-500',
             label: minutes <= 1 ? 'Recién aceptado' : `Hace ${minutes} min`,
         };
+        
         if (minutes < 20) return {
             bg:    'bg-yellow-100',
             text:  'text-yellow-800',
             dot:   'bg-yellow-500',
             label: `Hace ${minutes} min`,
         };
+
         return {
             bg:    'bg-red-100',
             text:  'text-red-700',
@@ -373,11 +563,12 @@
     }
 
     const viewTitles = {
-        orders:     'Pedidos',
-        categories: 'Categorías',
-        variations: 'Tipos de Producto',
-        options:    'Opciones / Precios',
-        settings:   'Ajustes',
+        orders:          'Pedidos',
+        categories:      'Categorías',
+        'product-types': 'Módulos de Comida',
+        variations:      'Variaciones de Producto',
+        options:         'Opciones / Precios',
+        settings:        'Ajustes',
     };
 
     function switchView(viewName) {
@@ -428,6 +619,9 @@
             }
             renderOrders();
             setOrderTab(currentOrderTab); // Refresh tab style
+        } else if (currentView === 'product-types') {
+            dataCache.productTypes = data;
+            renderProductTypes();
         } else if (currentView === 'categories') {
             dataCache.categories = data;
             renderCategories();
@@ -597,7 +791,10 @@
             return;
         }
 
-        const targetLabels = { tortihamburguesa: '🍔 Tortihamburguesa', burrito: '🌯 Burrito' };
+        const targetLabels = dataCache.productTypes.reduce((acc, t) => {
+            acc[t.slug] = `${t.emoji || '🍔'} ${t.name}`;
+            return acc;
+        }, { ambos: 'Todos' });
 
         // Agrupar por product_target
         const grouped = variations.reduce((acc, v) => {
@@ -650,15 +847,19 @@
         content.className = "bg-white w-full max-w-md rounded-3xl shadow-2xl overflow-y-auto p-8 max-h-[95vh] custom-scrollbar";
 
         content.innerHTML = `
-            <h3 class="text-2xl font-black mb-6 uppercase">${v ? 'Editar Variación' : 'Nueva Variación'}</h3>
+            <div class="flex justify-between items-center mb-6">
+                <h3 class="text-2xl font-black uppercase">${v ? 'Editar Variación' : 'Nueva Variación'}</h3>
+                <button onclick="closeModal()" class="text-gray-400 hover:text-red-600 transition-colors text-2xl leading-none">&times;</button>
+            </div>
             <form id="variationForm" class="space-y-5">
                 <input type="hidden" name="id" value="${v ? v.id : ''}">
 
                 <div>
                     <label class="block text-[10px] font-black text-gray-400 uppercase mb-1">Producto al que pertenece</label>
                     <select name="product_target" class="w-full p-4 bg-gray-50 rounded-2xl border-2 border-transparent focus:border-red-600 outline-none font-bold">
-                        <option value="tortihamburguesa" ${v?.product_target === 'tortihamburguesa' ? 'selected' : ''}>🍔 Tortihamburguesa</option>
-                        <option value="burrito" ${v?.product_target === 'burrito' ? 'selected' : ''}>🌯 Burrito</option>
+                        ${dataCache.productTypes.map(t => `
+                            <option value="${t.slug}" ${v?.product_target === t.slug ? 'selected' : ''}>${t.emoji} ${t.name}</option>
+                        `).join('')}
                     </select>
                 </div>
 
@@ -867,7 +1068,10 @@
         };
         
         content.innerHTML = `
-            <h3 class="text-2xl font-black mb-6 uppercase">${cat ? 'Editar Categoría' : 'Nueva Categoría'}</h3>
+            <div class="flex justify-between items-center mb-6">
+                <h3 class="text-2xl font-black uppercase">${cat ? 'Editar Categoría' : 'Nueva Categoría'}</h3>
+                <button onclick="closeModal()" class="text-gray-400 hover:text-red-600 transition-colors text-2xl leading-none">&times;</button>
+            </div>
             <form id="categoryForm" class="space-y-4">
                 <input type="hidden" name="id" value="${cat ? cat.id : ''}">
                 <div>
@@ -886,15 +1090,20 @@
                 </div>
                 <div>
                     <label class="block text-[10px] font-black text-gray-400 uppercase mb-1">Tipo de Producto</label>
-                    <select name="product_type" id="modalProductType" class="w-full p-4 bg-gray-50 rounded-2xl border-2 border-transparent focus:border-red-600 outline-none font-bold">
-                        <option value="ambos" ${currentType === 'ambos' ? 'selected' : ''}>AMBOS</option>
-                        <option value="burrito" ${currentType === 'burrito' ? 'selected' : ''}>BURRITO</option>
-                        <option value="tortihamburguesa" ${currentType === 'tortihamburguesa' ? 'selected' : ''}>TORTIHAMBURGUESA</option>
+                    <select name="product_type" id="modalProductType" class="w-full p-4 bg-gray-50 rounded-2xl border-2 border-transparent focus:border-red-600 outline-none font-bold text-xs uppercase">
+                        <option value="ambos" ${currentType === 'ambos' ? 'selected' : ''}>— TODOS —</option>
+                        ${dataCache.productTypes.map(t => `
+                            <option value="${t.slug}" ${currentType === t.slug ? 'selected' : ''}>${t.name}</option>
+                        `).join('')}
                     </select>
                 </div>
                 <div class="flex items-center gap-3 py-2">
                     <input type="checkbox" name="is_required" id="is_req" ${cat?.is_required ? 'checked' : ''} class="w-5 h-5 rounded-lg">
                     <label for="is_req" class="text-sm font-bold text-gray-600">Es obligatorio</label>
+                </div>
+                <div class="flex items-center gap-3 py-2">
+                    <input type="checkbox" name="allow_quantity" id="allow_qty" ${cat?.allow_quantity == 1 ? 'checked' : ''} class="w-5 h-5 rounded-lg accent-blue-600">
+                    <label for="allow_qty" class="text-sm font-bold text-gray-600">Permitir cantidades (Contador +/-)</label>
                 </div>
                 <div class="flex items-center gap-3 py-2 border-t mt-2 pt-4">
                     <input type="checkbox" name="is_active" id="is_active_cat" ${(!cat || Number(cat.is_active) === 1) ? 'checked' : ''} class="w-5 h-5 rounded-lg">
@@ -954,6 +1163,7 @@
             const data = Object.fromEntries(formData);
             data.is_required = formData.get('is_required') === 'on' ? 1 : 0;
             data.is_active   = formData.get('is_active')   === 'on' ? 1 : 0;
+            data.allow_quantity = formData.get('allow_quantity') === 'on' ? 1 : 0;
             
             // Recoger configuración detallada de variaciones (ID + Máximo override)
             const variationCheckboxes = e.target.querySelectorAll('input[name="variation_ids"]:checked');
@@ -987,7 +1197,10 @@
         content.className = "bg-white w-full max-w-lg rounded-3xl shadow-2xl overflow-y-auto p-8 max-h-[95vh] custom-scrollbar";
         
         content.innerHTML = `
-            <h3 class="text-2xl font-black mb-6 uppercase">${opt ? 'Editar Ingrediente' : 'Nuevo Ingrediente'}</h3>
+            <div class="flex justify-between items-center mb-6">
+                <h3 class="text-2xl font-black uppercase">${opt ? 'Editar Ingrediente' : 'Nuevo Ingrediente'}</h3>
+                <button onclick="closeModal()" class="text-gray-400 hover:text-red-600 transition-colors text-2xl leading-none">&times;</button>
+            </div>
             <form id="optionForm" class="space-y-4">
                 <input type="hidden" name="id" value="${opt ? opt.id : ''}">
                 <div>
@@ -1101,7 +1314,10 @@
                             ${item.options.map(opt => `
                                 <li class="flex items-start gap-2 text-sm">
                                     <span class="text-red-600 font-black mt-0.5 text-xs">●</span>
-                                    <span class="font-bold text-gray-700 uppercase tracking-tight leading-tight">${opt.name}</span>
+                                    <span class="font-bold text-gray-700 uppercase tracking-tight leading-tight">
+                                        ${opt.name}
+                                        ${opt.quantity > 1 ? `<span class="text-red-600 ml-1 font-black">x${opt.quantity}</span>` : ''}
+                                    </span>
                                 </li>
                             `).join('')}
                         </ul>
@@ -1158,11 +1374,11 @@
     }
 
     // ── Helper: construye y abre el link de WhatsApp para un pedido ──────────
-    function sendWhatsApp(order) {
+    function sendWhatsApp(order, customText = null) {
         if (!order || !order.customer_phone) return;
         let phone = order.customer_phone.replace(/[\s\-\(\)\+]/g, '');
         if (!phone.startsWith('57')) phone = '57' + phone;
-        const texto = `Hola ${order.customer_name}, tu pedido #${order.id} ha sido aceptado y está en preparación. ¡Gracias por elegir Deli Burrito!`;
+        const texto = customText || `Hola ${order.customer_name}, tu pedido #${order.id} ha sido aceptado y está en preparación. ¡Gracias por elegir Deli Burrito!`;
         const a = document.createElement('a');
         a.href = `https://wa.me/${phone}?text=${encodeURIComponent(texto)}`;
         a.target = '_blank';
@@ -1222,10 +1438,60 @@
         };
     };
 
+    // ── Cancelar pedido: similar al de aceptar ────────────────────────────────
+    window.cancelOrderFlow = (id) => {
+        const order = dataCache.orders.find(o => o.id == id);
+        const overlay  = document.getElementById('confirmOverlay');
+        const titleEl  = document.getElementById('confirmTitle');
+        const msgEl    = document.getElementById('confirmMessage');
+        const yesBtn   = document.getElementById('confirmYes');
+        const noBtn    = document.getElementById('confirmCancel');
+
+        titleEl.textContent = '¿Cancelar pedido?';
+        msgEl.textContent   = order?.customer_phone
+            ? '¿Deseas enviar el mensaje de WhatsApp al cliente informando la cancelación?'
+            : 'El cliente no tiene teléfono registrado. Se cancelará sin WhatsApp.';
+        yesBtn.textContent  = order?.customer_phone ? '✅ Sí, enviar WhatsApp' : '✅ Cancelar';
+        noBtn.textContent   = order?.customer_phone ? '🚫 No, solo cancelar'   : 'Volver';
+
+        overlay.classList.remove('hidden');
+
+        const cleanUp = () => {
+            overlay.classList.add('hidden');
+            yesBtn.onclick = null;
+            noBtn.onclick  = null;
+            yesBtn.textContent = 'Sí, borrar';
+            noBtn.textContent  = 'Mejor no';
+            titleEl.textContent = '¿Estás seguro?';
+            msgEl.textContent   = 'Esta acción no se puede deshacer fácilmente.';
+        };
+
+        const cancelText = `Hola ${order.customer_name}, lamentamos informarte que tu pedido #${order.id} ha sido cancelado. Si tienes dudas, contáctanos. Deli Burrito.`;
+
+        yesBtn.onclick = async () => {
+            cleanUp();
+            await fetch(`${apiBase}/admin-api.php?route=orders/${id}/cancelado`, { method: 'POST' });
+            showToast('Pedido cancelado', 'error');
+            if (order?.customer_phone) sendWhatsApp(order, cancelText);
+            loadViewData();
+        };
+
+        noBtn.onclick = async () => {
+            if (!order?.customer_phone) { cleanUp(); return; }
+            cleanUp();
+            await fetch(`${apiBase}/admin-api.php?route=orders/${id}/cancelado`, { method: 'POST' });
+            showToast('Pedido cancelado', 'error');
+            loadViewData();
+        };
+    };
+
     window.updateOrderStatus = async (id, status) => {
         if (status === 'aceptado') {
-            // Redirigir al nuevo flujo con confirmación
             window.acceptOrderFlow(id);
+            return;
+        }
+        if (status === 'cancelado') {
+            window.cancelOrderFlow(id);
             return;
         }
         const order = dataCache.orders.find(o => o.id == id);
@@ -1243,22 +1509,27 @@
     }, 1000);
 
     // Initial Load
-    document.addEventListener('DOMContentLoaded', () => {
+    document.addEventListener('DOMContentLoaded', async () => {
         // Verificar sesion real contra el servidor
-        fetch('/admin-api.php?route=admin-check', { credentials: 'include' })
-            .then(r => r.json())
-            .then(data => {
-                if (!data.authenticated) {
-                    window.location.href = '/admin/login/';
-                    return;
-                }
-                switchView('orders');
-                setOrderTab('pendiente');
-                setDateFilter('today');
-            })
-            .catch(() => {
+        try {
+            const authResp = await fetch('/admin-api.php?route=admin-check', { credentials: 'include' });
+            const authData = await authResp.json();
+            
+            if (!authData.authenticated) {
                 window.location.href = '/admin/login/';
-            });
+                return;
+            }
+
+            // Pre-cargar tipos de producto para que los selects de los modales funcionen desde el inicio
+            const ptResp = await fetch(`${apiBase}/admin-api.php?route=product-types`);
+            if (ptResp.ok) dataCache.productTypes = await ptResp.json();
+
+            switchView('orders');
+            setOrderTab('pendiente');
+            setDateFilter('today');
+        } catch (e) {
+            window.location.href = '/admin/login/';
+        }
     });
 
     document.getElementById('refreshBtn').onclick = loadViewData;
