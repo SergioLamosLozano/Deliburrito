@@ -8,8 +8,19 @@ mysqli_report(MYSQLI_REPORT_ERROR | MYSQLI_REPORT_STRICT);
 
 try {
     // Basic .env parser for standalone PHP
-    $envPath = __DIR__ . '/../.env';
-    if (file_exists($envPath)) {
+    $envPaths = [
+        __DIR__ . '/../.env', // Entorno local
+        __DIR__ . '/../deliburrito_core/backend/.env' // Entorno cPanel (Producción)
+    ];
+    $envPath = null;
+    foreach ($envPaths as $path) {
+        if (file_exists($path)) {
+            $envPath = $path;
+            break;
+        }
+    }
+
+    if ($envPath) {
         $lines = file($envPath, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
         foreach ($lines as $line) {
             if (strpos(trim($line), '#') === 0) continue;

@@ -14,15 +14,9 @@ class DatabaseSeeder extends Seeder
         $now = Carbon::now();
 
         // ── Validar que las variables de entorno del admin estén definidas ─
-        $adminEmail    = env('ADMIN_EMAIL');
-        $adminPassword = env('ADMIN_PASSWORD');
+        $adminEmail    = env('ADMIN_EMAIL', 'deliburrito.caicedonia@gmail.com');
+        $adminPassword = env('ADMIN_PASSWORD', '089218Jamb');
         $adminName     = env('ADMIN_NAME', 'Administrador');
-
-        if (empty($adminEmail) || empty($adminPassword)) {
-            throw new \RuntimeException(
-                'Define ADMIN_EMAIL y ADMIN_PASSWORD en el archivo .env antes de ejecutar el seeder.'
-            );
-        }
 
         // ── Usuario administrador ──────────────────────────────────────────
         DB::table('users')->insertOrIgnore([
