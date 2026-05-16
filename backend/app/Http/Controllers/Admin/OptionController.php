@@ -42,8 +42,7 @@ class OptionController extends Controller
         $data = $request->validate([
             'category_id' => 'required|exists:categories,id',
             'name' => 'required|string|max:255',
-            'price_base' => 'nullable|numeric|min:0',
-            'price_extra' => 'nullable|numeric|min:0',
+            'price' => 'nullable|numeric|min:0',
             'is_active' => 'sometimes|boolean',
         ]);
 
@@ -64,8 +63,7 @@ class OptionController extends Controller
         $data = $request->validate([
             'category_id' => 'required|exists:categories,id',
             'name' => 'required|string|max:255',
-            'price_base' => 'nullable|numeric|min:0',
-            'price_extra' => 'nullable|numeric|min:0',
+            'price' => 'nullable|numeric|min:0',
             'is_active' => 'sometimes|boolean',
         ]);
 

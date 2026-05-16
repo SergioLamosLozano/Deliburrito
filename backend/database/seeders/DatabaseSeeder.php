@@ -51,10 +51,10 @@ class DatabaseSeeder extends Seeder
         ]);
 
         DB::table('options')->insert([
-            ['category_id' => $proteinaPrincipalId, 'name' => 'Res',         'price_base' => 13000, 'price_extra' => 4000, 'is_active' => true, 'created_at' => $now, 'updated_at' => $now],
-            ['category_id' => $proteinaPrincipalId, 'name' => 'Cerdo Pesto', 'price_base' => 14000, 'price_extra' => 4500, 'is_active' => true, 'created_at' => $now, 'updated_at' => $now],
-            ['category_id' => $proteinaPrincipalId, 'name' => 'Costilla',    'price_base' => 15000, 'price_extra' => 5000, 'is_active' => true, 'created_at' => $now, 'updated_at' => $now],
-            ['category_id' => $proteinaPrincipalId, 'name' => 'Pollo',       'price_base' => 12000, 'price_extra' => 3500, 'is_active' => true, 'created_at' => $now, 'updated_at' => $now],
+            ['category_id' => $proteinaPrincipalId, 'name' => 'Res',         'price' => 4000, 'is_active' => true, 'created_at' => $now, 'updated_at' => $now],
+            ['category_id' => $proteinaPrincipalId, 'name' => 'Cerdo Pesto', 'price' => 4500, 'is_active' => true, 'created_at' => $now, 'updated_at' => $now],
+            ['category_id' => $proteinaPrincipalId, 'name' => 'Costilla',    'price' => 5000, 'is_active' => true, 'created_at' => $now, 'updated_at' => $now],
+            ['category_id' => $proteinaPrincipalId, 'name' => 'Pollo',       'price' => 3500, 'is_active' => true, 'created_at' => $now, 'updated_at' => $now],
         ]);
 
         // 2. Proteínas Adicionales (opcional, hasta 2)
@@ -69,9 +69,9 @@ class DatabaseSeeder extends Seeder
         ]);
 
         DB::table('options')->insert([
-            ['category_id' => $proteinasAdicionalesId, 'name' => 'Res Extra',   'price_base' => 0, 'price_extra' => 4000, 'is_active' => true, 'created_at' => $now, 'updated_at' => $now],
-            ['category_id' => $proteinasAdicionalesId, 'name' => 'Pollo Extra', 'price_base' => 0, 'price_extra' => 3500, 'is_active' => true, 'created_at' => $now, 'updated_at' => $now],
-            ['category_id' => $proteinasAdicionalesId, 'name' => 'Cerdo Extra', 'price_base' => 0, 'price_extra' => 4500, 'is_active' => true, 'created_at' => $now, 'updated_at' => $now],
+            ['category_id' => $proteinasAdicionalesId, 'name' => 'Res Extra',   'price' => 4000, 'is_active' => true, 'created_at' => $now, 'updated_at' => $now],
+            ['category_id' => $proteinasAdicionalesId, 'name' => 'Pollo Extra', 'price' => 3500, 'is_active' => true, 'created_at' => $now, 'updated_at' => $now],
+            ['category_id' => $proteinasAdicionalesId, 'name' => 'Cerdo Extra', 'price' => 4500, 'is_active' => true, 'created_at' => $now, 'updated_at' => $now],
         ]);
 
         // 3. Sabor Crunch (opcional)
@@ -86,9 +86,9 @@ class DatabaseSeeder extends Seeder
         ]);
 
         DB::table('options')->insert([
-            ['category_id' => $saborCrunchId, 'name' => 'Papas Crunch',   'price_base' => 0, 'price_extra' => 2000, 'is_active' => true, 'created_at' => $now, 'updated_at' => $now],
-            ['category_id' => $saborCrunchId, 'name' => 'Nachos Crunch',  'price_base' => 0, 'price_extra' => 2500, 'is_active' => true, 'created_at' => $now, 'updated_at' => $now],
-            ['category_id' => $saborCrunchId, 'name' => 'Plátano Crunch', 'price_base' => 0, 'price_extra' => 1500, 'is_active' => true, 'created_at' => $now, 'updated_at' => $now],
+            ['category_id' => $saborCrunchId, 'name' => 'Papas Crunch',   'price' => 2000, 'is_active' => true, 'created_at' => $now, 'updated_at' => $now],
+            ['category_id' => $saborCrunchId, 'name' => 'Nachos Crunch',  'price' => 2500, 'is_active' => true, 'created_at' => $now, 'updated_at' => $now],
+            ['category_id' => $saborCrunchId, 'name' => 'Plátano Crunch', 'price' => 1500, 'is_active' => true, 'created_at' => $now, 'updated_at' => $now],
         ]);
 
         // 4. Tipo de Queso (opcional)
@@ -103,9 +103,9 @@ class DatabaseSeeder extends Seeder
         ]);
 
         DB::table('options')->insert([
-            ['category_id' => $tipoQuesoId, 'name' => 'Queso Mozzarella', 'price_base' => 0, 'price_extra' => 1000, 'is_active' => true, 'created_at' => $now, 'updated_at' => $now],
-            ['category_id' => $tipoQuesoId, 'name' => 'Queso Americano',  'price_base' => 0, 'price_extra' =>  800, 'is_active' => true, 'created_at' => $now, 'updated_at' => $now],
-            ['category_id' => $tipoQuesoId, 'name' => 'Doble Queso',      'price_base' => 0, 'price_extra' => 1500, 'is_active' => true, 'created_at' => $now, 'updated_at' => $now],
+            ['category_id' => $tipoQuesoId, 'name' => 'Queso Mozzarella', 'price' => 1000, 'is_active' => true, 'created_at' => $now, 'updated_at' => $now],
+            ['category_id' => $tipoQuesoId, 'name' => 'Queso Americano',  'price' =>  800, 'is_active' => true, 'created_at' => $now, 'updated_at' => $now],
+            ['category_id' => $tipoQuesoId, 'name' => 'Doble Queso',      'price' => 1500, 'is_active' => true, 'created_at' => $now, 'updated_at' => $now],
         ]);
 
         // 5. Salsa 1 (opcional)
@@ -120,9 +120,9 @@ class DatabaseSeeder extends Seeder
         ]);
 
         DB::table('options')->insert([
-            ['category_id' => $salsa1Id, 'name' => 'Salsa Roja',   'price_base' => 0, 'price_extra' => 0, 'is_active' => true, 'created_at' => $now, 'updated_at' => $now],
-            ['category_id' => $salsa1Id, 'name' => 'Salsa Verde',  'price_base' => 0, 'price_extra' => 0, 'is_active' => true, 'created_at' => $now, 'updated_at' => $now],
-            ['category_id' => $salsa1Id, 'name' => 'Salsa Blanca', 'price_base' => 0, 'price_extra' => 0, 'is_active' => true, 'created_at' => $now, 'updated_at' => $now],
+            ['category_id' => $salsa1Id, 'name' => 'Salsa Roja',   'price' => 0, 'is_active' => true, 'created_at' => $now, 'updated_at' => $now],
+            ['category_id' => $salsa1Id, 'name' => 'Salsa Verde',  'price' => 0, 'is_active' => true, 'created_at' => $now, 'updated_at' => $now],
+            ['category_id' => $salsa1Id, 'name' => 'Salsa Blanca', 'price' => 0, 'is_active' => true, 'created_at' => $now, 'updated_at' => $now],
         ]);
 
         // 6. Salsa 2 (opcional)
@@ -137,10 +137,10 @@ class DatabaseSeeder extends Seeder
         ]);
 
         DB::table('options')->insert([
-            ['category_id' => $salsa2Id, 'name' => 'Salsa Roja',   'price_base' => 0, 'price_extra' =>    0, 'is_active' => true, 'created_at' => $now, 'updated_at' => $now],
-            ['category_id' => $salsa2Id, 'name' => 'Salsa Verde',  'price_base' => 0, 'price_extra' =>    0, 'is_active' => true, 'created_at' => $now, 'updated_at' => $now],
-            ['category_id' => $salsa2Id, 'name' => 'Salsa Blanca', 'price_base' => 0, 'price_extra' =>    0, 'is_active' => true, 'created_at' => $now, 'updated_at' => $now],
-            ['category_id' => $salsa2Id, 'name' => 'Picante',      'price_base' => 0, 'price_extra' =>  500, 'is_active' => true, 'created_at' => $now, 'updated_at' => $now],
+            ['category_id' => $salsa2Id, 'name' => 'Salsa Roja',   'price' =>    0, 'is_active' => true, 'created_at' => $now, 'updated_at' => $now],
+            ['category_id' => $salsa2Id, 'name' => 'Salsa Verde',  'price' =>    0, 'is_active' => true, 'created_at' => $now, 'updated_at' => $now],
+            ['category_id' => $salsa2Id, 'name' => 'Salsa Blanca', 'price' =>    0, 'is_active' => true, 'created_at' => $now, 'updated_at' => $now],
+            ['category_id' => $salsa2Id, 'name' => 'Picante',      'price' =>  500, 'is_active' => true, 'created_at' => $now, 'updated_at' => $now],
         ]);
 
         // 7. Adiciones Extra (Papas, Bebidas, etc.)
@@ -155,11 +155,11 @@ class DatabaseSeeder extends Seeder
         ]);
 
         DB::table('options')->insert([
-            ['category_id' => $adicionesId, 'name' => 'Papas a la Francesa', 'price_base' => 0, 'price_extra' => 3000, 'is_active' => true, 'created_at' => $now, 'updated_at' => $now],
-            ['category_id' => $adicionesId, 'name' => 'Aros de Cebolla',     'price_base' => 0, 'price_extra' => 2500, 'is_active' => true, 'created_at' => $now, 'updated_at' => $now],
-            ['category_id' => $adicionesId, 'name' => 'Coca Cola',           'price_base' => 0, 'price_extra' => 2000, 'is_active' => true, 'created_at' => $now, 'updated_at' => $now],
-            ['category_id' => $adicionesId, 'name' => 'Agua',                'price_base' => 0, 'price_extra' => 1000, 'is_active' => true, 'created_at' => $now, 'updated_at' => $now],
-            ['category_id' => $adicionesId, 'name' => 'Cerveza',             'price_base' => 0, 'price_extra' => 5000, 'is_active' => true, 'created_at' => $now, 'updated_at' => $now],
+            ['category_id' => $adicionesId, 'name' => 'Papas a la Francesa', 'price' => 3000, 'is_active' => true, 'created_at' => $now, 'updated_at' => $now],
+            ['category_id' => $adicionesId, 'name' => 'Aros de Cebolla',     'price' => 2500, 'is_active' => true, 'created_at' => $now, 'updated_at' => $now],
+            ['category_id' => $adicionesId, 'name' => 'Coca Cola',           'price' => 2000, 'is_active' => true, 'created_at' => $now, 'updated_at' => $now],
+            ['category_id' => $adicionesId, 'name' => 'Agua',                'price' => 1000, 'is_active' => true, 'created_at' => $now, 'updated_at' => $now],
+            ['category_id' => $adicionesId, 'name' => 'Cerveza',             'price' => 5000, 'is_active' => true, 'created_at' => $now, 'updated_at' => $now],
         ]);
     }
 }

@@ -19,7 +19,7 @@ function VariationModal({ variation, onClose }) {
   const { data, setData, post, put, errors, processing, reset } = useForm({
     product_target: variation?.product_target ?? 'tortihamburguesa',
     name:           variation?.name           ?? '',
-    base_price:     variation?.base_price      ?? '',
+    price:          variation?.price          ?? '',
     is_active:      variation?.is_active       ?? true,
   });
 
@@ -93,14 +93,14 @@ function VariationModal({ variation, onClose }) {
           {/* Precio base */}
           <div>
             <label className="block text-sm font-semibold text-gray-700 mb-2">
-              Precio Base *
+              Precio *
             </label>
             <div className="relative">
               <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 font-bold">$</span>
               <input
                 type="number"
-                value={data.base_price}
-                onChange={(e) => setData('base_price', e.target.value)}
+                value={data.price}
+                onChange={(e) => setData('price', e.target.value)}
                 placeholder="0"
                 min="0"
                 step="100"
@@ -108,8 +108,8 @@ function VariationModal({ variation, onClose }) {
                 required
               />
             </div>
-            {errors.base_price && (
-              <p className="text-red-600 text-xs mt-1">{errors.base_price}</p>
+            {errors.price && (
+              <p className="text-red-600 text-xs mt-1">{errors.price}</p>
             )}
           </div>
 
@@ -259,7 +259,7 @@ export default function ProductVariationsIndex({ variations = [], flash = {} }) 
                       <tr key={v.id} className="hover:bg-gray-50 transition-colors">
                         <td className="px-6 py-4 font-bold text-gray-800">{v.name}</td>
                         <td className="px-6 py-4 font-black text-red-600">
-                          ${parseInt(v.base_price).toLocaleString('es-CO')}
+                          ${parseInt(v.price).toLocaleString('es-CO')}
                         </td>
                         <td className="px-6 py-4">
                           <span className={`px-3 py-1 rounded-full text-xs font-black uppercase ${

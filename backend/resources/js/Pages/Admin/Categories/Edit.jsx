@@ -11,7 +11,7 @@ export default function Edit({ category, variations = {} }) {
   const { data, setData, put, errors } = useForm({
     name: category.name || '',
     product_type: category.product_type || 'ambos',
-    is_required: category.is_required || false,
+    is_required: category.is_required ?? false,
     max_selections: category.max_selections || 1,
     order_index: category.order_index || 1,
     // Pre-marcar las variaciones ya asignadas
@@ -144,9 +144,9 @@ export default function Edit({ category, variations = {} }) {
                         />
                         <span className="text-sm font-semibold text-gray-700 group-hover:text-red-600 transition-colors">
                           {v.name}
-                          {v.base_price > 0 && (
+                          {v.price > 0 && (
                             <span className="ml-2 text-xs text-gray-400 font-normal">
-                              ${parseInt(v.base_price).toLocaleString()}
+                              ${parseInt(v.price).toLocaleString()}
                             </span>
                           )}
                         </span>

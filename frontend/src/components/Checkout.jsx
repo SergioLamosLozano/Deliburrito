@@ -6,7 +6,7 @@ function getCsrfToken() {
   return match ? decodeURIComponent(match[1]) : '';
 }
 
-export default function Checkout({ cartItems, onBack, onSuccess, onRemoveItem, showToast }) {
+export default function Checkout({ cartItems, onBack, onSuccess, onRemoveItem, onDuplicateItem, showToast }) {
   const [formData, setFormData] = useState({
     customer_name: '',
     customer_phone: '',
@@ -107,13 +107,22 @@ export default function Checkout({ cartItems, onBack, onSuccess, onRemoveItem, s
                                 <p className="text-[10px] text-gray-500 line-clamp-2">{item.selection_summary}</p>
                                 <p className="text-red-600 font-black text-sm mt-2">${(parseFloat(item.item_total) || 0).toLocaleString()}</p>
                             </div>
-                            <button 
-                                onClick={() => onRemoveItem(item.id)}
-                                className="bg-red-100 text-red-600 p-2 rounded-xl hover:bg-red-600 hover:text-white transition-all shadow-sm"
-                                title="Eliminar ítem"
-                            >
-                                🗑️
-                            </button>
+                            <div className="flex flex-col gap-2">
+                                <button 
+                                    onClick={() => onRemoveItem(item.id)}
+                                    className="bg-red-100 text-red-600 px-3 py-2 rounded-xl hover:bg-red-600 hover:text-white transition-all shadow-sm font-bold text-xs"
+                                    title="Eliminar ítem"
+                                >
+                                    🗑️ Eliminar
+                                </button>
+                                <button 
+                                    onClick={() => onDuplicateItem(item.id)}
+                                    className="bg-blue-100 text-blue-600 px-3 py-2 rounded-xl hover:bg-blue-600 hover:text-white transition-all shadow-sm font-bold text-xs"
+                                    title="Duplicar ítem"
+                                >
+                                    Duplicar
+                                </button>
+                            </div>
                         </div>
                         </div>
                     ))

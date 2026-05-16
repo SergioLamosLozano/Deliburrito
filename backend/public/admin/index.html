@@ -758,11 +758,24 @@
 
     function renderCategories() {
         const body = document.getElementById('categoriesTableBody');
+        
+        // Mapeo de product_type a nombres descriptivos
+        const productTypeLabels = {
+            'ambos': 'Todos',
+            'burrito': 'Burrito',
+            'tortihamburguesa': 'Tortihamburguesa'
+        };
+        
+        // Agregar los tipos dinámicos de productTypes
+        dataCache.productTypes.forEach(t => {
+            productTypeLabels[t.slug] = t.name;
+        });
+        
         body.innerHTML = dataCache.categories.map(cat => `
             <tr class="hover:bg-gray-50 transition-colors">
                 <td class="px-6 py-4 font-black text-gray-400">#${cat.order_index}</td>
                 <td class="px-6 py-4 font-bold text-gray-800">${cat.name}</td>
-                <td class="px-6 py-4"><span class="px-3 py-1 bg-gray-100 rounded-lg text-xs font-bold uppercase">${cat.product_type}</span></td>
+                <td class="px-6 py-4"><span class="px-3 py-1 bg-gray-100 rounded-lg text-xs font-bold uppercase">${productTypeLabels[cat.product_type] || cat.product_type}</span></td>
                 <td class="px-6 py-4">
                     <span class="px-3 py-1 ${Number(cat.is_active) === 1 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'} rounded-lg text-[10px] font-black uppercase">
                         ${Number(cat.is_active) === 1 ? 'Activo' : 'Inactivo'}
@@ -822,7 +835,7 @@
                         ${items.map(v => `
                             <tr class="hover:bg-gray-50 transition-colors">
                                 <td class="px-6 py-4 font-bold text-gray-800">${v.name}</td>
-                                <td class="px-6 py-4 font-black text-red-600">${money(v.base_price)}</td>
+                                <td class="px-6 py-4 font-black text-red-600">${money(v.price)}</td>
                                 <td class="px-6 py-4 text-center">
                                     <span class="px-3 py-1 ${Number(v.is_active) === 1 ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'} rounded-full text-[10px] font-black uppercase">
                                         ${Number(v.is_active) === 1 ? 'Activa' : 'Inactiva'}
@@ -879,7 +892,7 @@
                     <label class="block text-[10px] font-black text-gray-400 uppercase mb-1">Precio Base</label>
                     <div class="relative">
                         <span class="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 font-bold">$</span>
-                        <input type="number" name="base_price" value="${v ? v.base_price : ''}" placeholder="0" min="0" step="100" required
+                        <input type="number" name="price" value="${v ? v.price : ''}" placeholder="0" min="0" step="100" required
                             class="w-full pl-8 pr-4 p-4 bg-gray-50 rounded-2xl border-2 border-transparent focus:border-red-600 outline-none font-bold">
                     </div>
                 </div>
@@ -957,8 +970,7 @@
                     <thead class="bg-gray-50 text-[10px] font-black uppercase text-gray-400 tracking-widest border-b">
                         <tr>
                             <th class="px-6 py-3">Ingrediente</th>
-                            <th class="px-6 py-3">Precio Base</th>
-                            <th class="px-6 py-3">Precio Extra</th>
+                            <th class="px-6 py-3">Precio</th>
                             <th class="px-6 py-3 text-center">Estado</th>
                             <th class="px-6 py-3 text-right">Acciones</th>
                         </tr>
@@ -967,8 +979,7 @@
                         ${items.map(opt => `
                             <tr class="hover:bg-gray-50 transition-colors">
                                 <td class="px-6 py-4 font-bold text-gray-800">${opt.name}</td>
-                                <td class="px-6 py-4 font-black text-red-600">${money(opt.price_base)}</td>
-                                <td class="px-6 py-4 font-black text-green-600">+${money(opt.price_extra)}</td>
+                                <td class="px-6 py-4 font-black text-red-600">${money(opt.price)}</td>
                                 <td class="px-6 py-4 text-center">
                                     <span class="px-3 py-1 ${Number(opt.is_active) === 1 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'} rounded-lg text-[10px] font-black uppercase">
                                         ${Number(opt.is_active) === 1 ? 'Activo' : 'Inactivo'}
@@ -1048,7 +1059,7 @@
                                         class="w-4 h-4 rounded border-gray-300 accent-red-600">
                                     <span class="text-sm font-semibold text-gray-700 group-hover:text-red-600 transition-colors">
                                         ${v.name}
-                                        ${parseFloat(v.base_price) > 0 ? `<span class="text-gray-400 text-xs ml-1 font-normal">${money(v.base_price)}</span>` : ''}
+                                        ${parseFloat(v.price) > 0 ? `<span class="text-gray-400 text-xs ml-1 font-normal">${money(v.price)}</span>` : ''}
                                     </span>
                                 </label>
                                 <div class="flex items-center gap-2">
@@ -1098,7 +1109,7 @@
                     </select>
                 </div>
                 <div class="flex items-center gap-3 py-2">
-                    <input type="checkbox" name="is_required" id="is_req" ${cat?.is_required ? 'checked' : ''} class="w-5 h-5 rounded-lg">
+                    <input type="checkbox" name="is_required" id="is_req" ${Number(cat?.is_required) === 1 ? 'checked' : ''} class="w-5 h-5 rounded-lg">
                     <label for="is_req" class="text-sm font-bold text-gray-600">Es obligatorio</label>
                 </div>
                 <div class="flex items-center gap-3 py-2">
@@ -1213,15 +1224,9 @@
                     <label class="block text-[10px] font-black text-gray-400 uppercase mb-1">Nombre del ingrediente</label>
                     <input type="text" name="name" value="${opt ? opt.name : ''}" required class="w-full p-4 bg-gray-50 rounded-2xl border-2 border-transparent focus:border-red-600 outline-none font-bold">
                 </div>
-                <div class="grid grid-cols-2 gap-4">
-                    <div>
-                        <label class="block text-[10px] font-black text-gray-400 uppercase mb-1">Precio Base (Burrito)</label>
-                        <input type="number" name="price_base" value="${opt ? opt.price_base : 0}" required class="w-full p-4 bg-gray-50 rounded-2xl border-2 border-transparent focus:border-red-600 outline-none font-bold">
-                    </div>
-                    <div>
-                        <label class="block text-[10px] font-black text-gray-400 uppercase mb-1">Precio Extra (Adición)</label>
-                        <input type="number" name="price_extra" value="${opt ? opt.price_extra : 0}" required class="w-full p-4 bg-gray-50 rounded-2xl border-2 border-transparent focus:border-red-600 outline-none font-bold">
-                    </div>
+                <div>
+                    <label class="block text-[10px] font-black text-gray-400 uppercase mb-1">Precio ($)</label>
+                    <input type="number" name="price" value="${opt ? opt.price : 0}" required class="w-full p-4 bg-gray-50 rounded-2xl border-2 border-transparent focus:border-red-600 outline-none font-bold">
                 </div>
                 <div class="flex items-center gap-3 py-2">
                     <input type="checkbox" name="is_active" id="is_act" ${(!opt || Number(opt.is_active) !== 0) ? 'checked' : ''} class="w-5 h-5 rounded-lg">

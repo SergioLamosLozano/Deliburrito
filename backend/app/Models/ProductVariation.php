@@ -9,11 +9,11 @@ class ProductVariation extends Model
 {
     use HasFactory;
 
-    protected $fillable = ['product_target', 'name', 'description', 'base_price', 'is_active'];
+    protected $fillable = ['product_target', 'name', 'description', 'price', 'is_active'];
 
     protected $casts = [
-        'base_price' => 'float',
-        'is_active'  => 'boolean',
+        'price'     => 'float',
+        'is_active' => 'boolean',
     ];
 
     /**

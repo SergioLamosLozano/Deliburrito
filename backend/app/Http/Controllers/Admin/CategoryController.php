@@ -96,7 +96,7 @@ class CategoryController extends Controller
         $data = $request->validate([
             'name'          => 'required|string|max:255',
             'product_type'  => 'required|string|in:burrito,tortihamburguesa,ambos',
-            'is_required'   => 'sometimes|boolean',
+            'is_required'   => 'required|boolean',
             'max_selections'=> 'nullable|integer|min:1',
             'order_index'   => 'nullable|integer',
             'is_active'     => 'sometimes|boolean',

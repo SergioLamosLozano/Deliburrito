@@ -6,8 +6,7 @@ export default function OptionsEdit({ option, categories }) {
   const { data, setData, put, errors } = useForm({
     category_id: option.category_id || '',
     name: option.name || '',
-    price_base: option.price_base || 0,
-    price_extra: option.price_extra || 0,
+    price: option.price || 0,
   });
 
   const handleSubmit = (e) => {
@@ -46,30 +45,16 @@ export default function OptionsEdit({ option, categories }) {
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-semibold mb-2">Precio Base ($)</label>
-              <input
-                type="number"
-                value={data.price_base}
-                onChange={(e) => setData('price_base', parseFloat(e.target.value) || 0)}
-                className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:border-red-600"
-                min="0"
-                step="100"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-semibold mb-2">Precio Extra ($)</label>
-              <input
-                type="number"
-                value={data.price_extra}
-                onChange={(e) => setData('price_extra', parseFloat(e.target.value) || 0)}
-                className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:border-red-600"
-                min="0"
-                step="100"
-              />
-            </div>
+          <div>
+            <label className="block text-sm font-semibold mb-2">Precio ($)</label>
+            <input
+              type="number"
+              value={data.price}
+              onChange={(e) => setData('price', parseFloat(e.target.value) || 0)}
+              className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:border-red-600"
+              min="0"
+              step="100"
+            />
           </div>
 
           <div className="flex gap-3 pt-4">

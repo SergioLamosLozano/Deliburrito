@@ -252,7 +252,7 @@ function handleListCategories($db, $onlyActive = false) {
         }
         // Cargar variaciones habilitadas para esta categoría (tabla pivote category_variation)
         $varResult = $db->query(
-            "SELECT pv.id, pv.name, pv.product_target, pv.base_price, cv.max_selections
+            "SELECT pv.id, pv.name, pv.product_target, pv.price, cv.max_selections
              FROM product_variations pv
              INNER JOIN category_variation cv ON cv.product_variation_id = pv.id
              WHERE cv.category_id = " . (int)$cat['id']
@@ -412,11 +412,11 @@ function handleDeleteProductType($db, $id) {
 
 function handleCreateVariation($db) {
     $data = json_decode(file_get_contents('php://input'), true);
-    $stmt = $db->prepare("INSERT INTO product_variations (product_target, name, description, base_price, is_active) VALUES (?, ?, ?, ?, ?)");
+    $stmt = $db->prepare("INSERT INTO product_variations (product_target, name, description, price, is_active) VALUES (?, ?, ?, ?, ?)");
     $target = $data['product_target'];
     $name   = $data['name'];
     $desc   = $data['description'] ?? '';
-    $price  = (float)($data['base_price'] ?? 0);
+    $price  = (float)($data['price'] ?? 0);
     $active = (int)($data['is_active'] ?? 1);
     $stmt->bind_param('sssdi', $target, $name, $desc, $price, $active);
     $stmt->execute();
@@ -425,11 +425,11 @@ function handleCreateVariation($db) {
 
 function handleUpdateVariation($db, $id) {
     $data   = json_decode(file_get_contents('php://input'), true);
-    $stmt   = $db->prepare("UPDATE product_variations SET product_target=?, name=?, description=?, base_price=?, is_active=? WHERE id=?");
+    $stmt   = $db->prepare("UPDATE product_variations SET product_target=?, name=?, description=?, price=?, is_active=? WHERE id=?");
     $target = $data['product_target'];
     $name   = $data['name'];
     $desc   = $data['description'] ?? '';
-    $price  = (float)($data['base_price'] ?? 0);
+    $price  = (float)($data['price'] ?? 0);
     $active = (int)($data['is_active'] ?? 1);
     $id_int = (int)$id;
     $stmt->bind_param('sssdii', $target, $name, $desc, $price, $active, $id_int);
@@ -469,16 +469,16 @@ function handleListOptions($db) {
 
 function handleCreateOption($db) {
     $data = json_decode(file_get_contents('php://input'), true);
-    $stmt = $db->prepare("INSERT INTO options (category_id, name, price_base, price_extra, is_active) VALUES (?, ?, ?, ?, ?)");
-    $stmt->bind_param('isddi', $data['category_id'], $data['name'], $data['price_base'], $data['price_extra'], $data['is_active']);
+    $stmt = $db->prepare("INSERT INTO options (category_id, name, price, is_active) VALUES (?, ?, ?, ?)");
+    $stmt->bind_param('isdi', $data['category_id'], $data['name'], $data['price'], $data['is_active']);
     $stmt->execute();
     echo json_encode(['ok' => true, 'id' => $stmt->insert_id]);
 }
 
 function handleUpdateOption($db, $id) {
     $data = json_decode(file_get_contents('php://input'), true);
-    $stmt = $db->prepare("UPDATE options SET category_id=?, name=?, price_base=?, price_extra=?, is_active=? WHERE id=?");
-    $stmt->bind_param('isddii', $data['category_id'], $data['name'], $data['price_base'], $data['price_extra'], $data['is_active'], $id);
+    $stmt = $db->prepare("UPDATE options SET category_id=?, name=?, price=?, is_active=? WHERE id=?");
+    $stmt->bind_param('isdii', $data['category_id'], $data['name'], $data['price'], $data['is_active'], $id);
     $stmt->execute();
     echo json_encode(['ok' => true]);
 }
@@ -545,10 +545,9 @@ function handleCreateOrder($db) {
             $option_id = (int)($opt['option_id'] ?? 0);
             if ($option_id <= 0) continue;
 
-            $optRes = $db->query("SELECT price_base, price_extra FROM options WHERE id = " . $option_id);
+            $optRes = $db->query("SELECT price FROM options WHERE id = " . $option_id);
             if ($optRes && $optData = $optRes->fetch_assoc()) {
-                $is_primary = !empty($opt['is_primary']);
-                $price = $is_primary ? (float)$optData['price_base'] : (float)$optData['price_extra'];
+                $price = (float)$optData['price'];
                 $qty = (int)($opt['quantity'] ?? 1);
                 
                 $stmt3 = $db->prepare("INSERT INTO order_item_options (order_item_id, option_id, price_charged, quantity) VALUES (?, ?, ?, ?)");

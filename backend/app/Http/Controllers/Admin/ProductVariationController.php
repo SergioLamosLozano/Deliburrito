@@ -39,7 +39,7 @@ class ProductVariationController extends Controller
         $data = $request->validate([
             'product_target' => 'required|string|in:burrito,tortihamburguesa',
             'name'           => 'required|string|max:255',
-            'base_price'     => 'required|numeric|min:0',
+            'price'          => 'required|numeric|min:0',
             'is_active'      => 'sometimes|boolean',
         ]);
 
@@ -58,7 +58,7 @@ class ProductVariationController extends Controller
         $data = $request->validate([
             'product_target' => 'required|string|in:burrito,tortihamburguesa',
             'name'           => 'required|string|max:255',
-            'base_price'     => 'required|numeric|min:0',
+            'price'          => 'required|numeric|min:0',
             'is_active'      => 'sometimes|boolean',
         ]);
 

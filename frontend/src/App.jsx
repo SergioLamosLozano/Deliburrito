@@ -36,6 +36,13 @@ export default function App(){
     }
   };
 
+  const handleDuplicateItem = (id) => {
+    const item = cart.find(i => i.id === id);
+    if (!item) return;
+    setCart(prev => [...prev, { ...item, id: Date.now() }]);
+    showToast('Producto duplicado', 'success');
+  };
+
   const handleSuccess = (id) => {
     setOrderId(id);
     setView('success');
@@ -56,6 +63,7 @@ export default function App(){
           onBack={() => setView('builder')} 
           onSuccess={handleSuccess} 
           onRemoveItem={handleRemoveItem}
+          onDuplicateItem={handleDuplicateItem}
           showToast={showToast}
         />
       )}

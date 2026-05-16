@@ -11,6 +11,12 @@ class Category extends Model
 
     protected $fillable = ['name', 'product_type', 'is_required', 'max_selections', 'order_index', 'is_active', 'allow_quantity'];
 
+    protected $casts = [
+        'is_required'   => 'boolean',
+        'is_active'     => 'boolean',
+        'allow_quantity' => 'boolean',
+    ];
+
     public function options()
     {
         return $this->hasMany(Option::class);

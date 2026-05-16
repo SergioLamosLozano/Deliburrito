@@ -46,8 +46,7 @@ export default function OptionsIndex({ options }) {
               </div>
 
               <div className="mb-4 pb-4 border-b">
-                <p className="text-sm"><span className="font-semibold">Precio Base:</span> ${opt.price_base.toLocaleString()}</p>
-                <p className="text-sm"><span className="font-semibold">Precio Extra:</span> ${opt.price_extra.toLocaleString()}</p>
+                <p className="text-sm"><span className="font-semibold">Precio:</span> ${opt.price.toLocaleString()}</p>
               </div>
 
               <div className="flex gap-2">

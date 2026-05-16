@@ -148,9 +148,9 @@ export default function Create({ variations = {} }) {
                         />
                         <span className="text-sm font-semibold text-gray-700 group-hover:text-red-600 transition-colors">
                           {v.name}
-                          {v.base_price > 0 && (
+                          {v.price > 0 && (
                             <span className="ml-2 text-xs text-gray-400 font-normal">
-                              ${parseInt(v.base_price).toLocaleString()}
+                              ${parseInt(v.price).toLocaleString()}
                             </span>
                           )}
                         </span>

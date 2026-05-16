@@ -87,11 +87,11 @@ export default function BurritoBuilder({ onCheckout, initialCart = [], showToast
 
   // ── Precio total ─────────────────────────────────────────────────────────
   const calculateTotal = () => {
-    let total = selectedVariation ? parseFloat(selectedVariation.base_price || 0) : 0;
+    let total = selectedVariation ? parseFloat(selectedVariation.price || 0) : 0;
     filteredCategories.forEach(cat => {
       const sel = selection[cat.id];
       const items = Array.isArray(sel) ? sel : (sel ? [sel] : []);
-      items.forEach(item => { total += parseFloat(item.price_extra || 0) * (item.quantity || 1); });
+      items.forEach(item => { total += parseFloat(item.price || 0) * (item.quantity || 1); });
     });
     return total;
   };
@@ -311,7 +311,7 @@ export default function BurritoBuilder({ onCheckout, initialCart = [], showToast
                 }
                 <h2 className="text-xl font-black text-gray-800 uppercase tracking-tighter">{v.name}</h2>
                 <p className="text-orange-500 font-black mt-2 text-lg">
-                  ${parseInt(v.base_price).toLocaleString()}
+                  ${parseInt(v.price).toLocaleString()}
                 </p>
                 {v.description && (
                   <div className="mt-4 pt-3 border-t border-gray-100 w-full group-hover:border-orange-200 transition-colors">
@@ -345,7 +345,7 @@ export default function BurritoBuilder({ onCheckout, initialCart = [], showToast
                   {selectedVariation.name}
                 </span>
                 <span className="text-xs font-bold text-gray-400">
-                  ${parseInt(selectedVariation.base_price).toLocaleString()}
+                  ${parseInt(selectedVariation.price).toLocaleString()}
                 </span>
                 <span className="text-[10px] font-black text-gray-300 group-hover:text-orange-500 transition-colors uppercase tracking-widest ml-1">
                   cambiar
@@ -464,8 +464,8 @@ export default function BurritoBuilder({ onCheckout, initialCart = [], showToast
                               {option.name}
                             </span>
                             <span className={`font-black text-sm ${isSelected ? 'text-red-600' : 'text-gray-400'}`}>
-                              {parseFloat(option.price_extra) > 0
-                                ? `+${parseInt(option.price_extra).toLocaleString()}`
+                              {parseFloat(option.price) > 0
+                                ? `+${parseInt(option.price).toLocaleString()}`
                                 : 'GRATIS'}
                             </span>
                           </div>
@@ -529,7 +529,7 @@ export default function BurritoBuilder({ onCheckout, initialCart = [], showToast
                   {selectedVariation && (
                     <div className="flex justify-between text-sm font-bold border-b border-gray-100 pb-2">
                       <span className="text-orange-600 uppercase">BASE: {selectedVariation.name}</span>
-                      <span className="text-red-600">${parseInt(selectedVariation.base_price).toLocaleString()}</span>
+                      <span className="text-red-600">${parseInt(selectedVariation.price).toLocaleString()}</span>
                     </div>
                   )}
                   {filteredCategories.map(cat => {
@@ -540,8 +540,8 @@ export default function BurritoBuilder({ onCheckout, initialCart = [], showToast
                         <span className="text-gray-400 uppercase">
                           {it.quantity > 1 ? `(${it.quantity}) ` : ''}{it.name}
                         </span>
-                        {(parseFloat(it.price_extra) || 0) > 0 && (
-                          <span className="text-green-600">+${parseInt(it.price_extra * (it.quantity || 1)).toLocaleString()}</span>
+                        {(parseFloat(it.price) || 0) > 0 && (
+                          <span className="text-green-600">+${parseInt(it.price * (it.quantity || 1)).toLocaleString()}</span>
                         )}
                       </div>
                     ));

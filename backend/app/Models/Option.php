@@ -9,11 +9,10 @@ class Option extends Model
 {
     use HasFactory;
 
-    protected $fillable = ['category_id','name','price_base','price_extra','is_active'];
+    protected $fillable = ['category_id','name','price','is_active'];
 
     protected $casts = [
-        'price_base' => 'float',
-        'price_extra' => 'float',
+        'price'    => 'float',
         'is_active' => 'boolean',
     ];
 
