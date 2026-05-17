@@ -155,6 +155,9 @@ try {
         requireAdmin();
         if ($method === 'GET') handleListSettings($db);
         elseif ($method === 'POST') handleUpdateSetting($db);
+    } elseif ($path === '/public-config') {
+        // Endpoint público para que el frontend verifique si está abierto
+        if ($method === 'GET') handlePublicConfig($db);
     } elseif ($path === '/product-types') {
         if ($method === 'GET') handleListProductTypes($db);
         elseif ($method === 'POST') { requireAdmin(); handleCreateProductType($db); }
@@ -850,6 +853,12 @@ function handlePrintOrder($db, $id) {
 
 function handleListSettings($db) {
     $result = $db->query("SELECT * FROM settings");
+    echo json_encode($result->fetch_all(MYSQLI_ASSOC));
+}
+
+function handlePublicConfig($db) {
+    // Endpoint público que solo devuelve configuraciones necesarias para el frontend
+    $result = $db->query("SELECT `key`, `value` FROM settings WHERE `key` IN ('comercio_abierto', 'costo_domicilio')");
     echo json_encode($result->fetch_all(MYSQLI_ASSOC));
 }
 

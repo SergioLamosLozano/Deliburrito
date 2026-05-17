@@ -26,7 +26,7 @@ class MenuController extends Controller
      */
     public function publicConfig()
     {
-        $allowed  = ['costo_domicilio'];
+        $allowed  = ['costo_domicilio', 'comercio_abierto'];
         $settings = Setting::whereIn('key', $allowed)->get(['key', 'value']);
         return response()->json($settings);
     }

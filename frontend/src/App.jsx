@@ -11,6 +11,7 @@ export default function App(){
   const [categories, setCategories] = useState([]);
   const [showDuplicateModal, setShowDuplicateModal] = useState(false);
   const [itemToDuplicate, setItemToDuplicate] = useState(null);
+  const [storeOpen, setStoreOpen] = useState(true); // Estado del comercio
 
   // MEDIA-04: inicializar la cookie CSRF de Laravel al montar la app
   React.useEffect(() => {
@@ -23,6 +24,27 @@ export default function App(){
       .then(r => r.json())
       .then(data => setCategories(data))
       .catch(() => {});
+  }, []);
+
+  const checkStoreStatus = () => {
+    fetch('/public-config')
+      .then(r => r.json())
+      .then(settings => {
+        const openSetting = settings.find(s => s.key === 'comercio_abierto');
+        setStoreOpen(openSetting ? openSetting.value === '1' : true);
+      })
+      .catch(() => setStoreOpen(true)); // Por defecto abierto si hay error
+  };
+
+  // Verificar si el comercio está abierto
+  React.useEffect(() => {
+    // Verificar al cargar
+    checkStoreStatus();
+
+    // Verificar cada 30 segundos
+    const interval = setInterval(checkStoreStatus, 30000);
+
+    return () => clearInterval(interval);
   }, []);
 
   const showToast = (message, type = 'success') => {
@@ -227,6 +249,27 @@ export default function App(){
           </div>
         ))}
       </div>
+
+      {/* Modal de Comercio Cerrado */}
+      {!storeOpen && (
+        <div className="fixed inset-0 bg-black/90 backdrop-blur-md z-[300] flex items-center justify-center p-4">
+          <div className="bg-white rounded-[3rem] p-8 sm:p-12 max-w-full sm:max-w-lg w-full shadow-2xl border-4 border-red-600 text-center animate-in zoom-in duration-500 max-h-[90vh] overflow-y-auto">
+            <div className="mb-8">
+              <span className="text-7xl sm:text-8xl mb-6 block animate-pulse">🔒</span>
+              <h2 className="text-3xl sm:text-4xl font-black text-red-600 uppercase tracking-tighter mb-4">
+                ¡Lo sentimos!
+              </h2>
+              <p className="text-lg sm:text-xl font-bold text-gray-700 leading-relaxed">
+                El comercio aún no ha abierto
+              </p>
+              <p className="text-sm text-gray-500 font-bold mt-4">
+                Por favor, vuelve más tarde para realizar tu pedido
+              </p>
+            </div>
+            
+          </div>
+        </div>
+      )}
     </>
   );
 }
