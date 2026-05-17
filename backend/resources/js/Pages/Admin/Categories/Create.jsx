@@ -14,6 +14,7 @@ export default function Create({ variations = {} }) {
     product_type: 'ambos',
     is_required: false,
     is_addon: false,
+    show_in_summary: false,
     max_selections: 1,
     order_index: 8,
     variation_ids: [],
@@ -125,6 +126,17 @@ export default function Create({ variations = {} }) {
               className="w-5 h-5 rounded border-gray-300"
             />
             <span className="font-semibold">Es adicional (se puede excluir al duplicar)</span>
+          </label>
+
+          {/* Mostrar en resumen */}
+          <label className="flex items-center space-x-3 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={data.show_in_summary}
+              onChange={(e) => setData('show_in_summary', e.target.checked)}
+              className="w-5 h-5 rounded border-gray-300"
+            />
+            <span className="font-semibold">Mostrar en resumen del pedido (aparece arriba junto al cliente)</span>
           </label>
 
           {/* ── Variaciones de Producto ──────────────────────────────── */}

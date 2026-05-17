@@ -1,6 +1,9 @@
 <?php
 
 // Deli Burrito - Simple PHP Server (No Composer Required)
+// Configurar zona horaria de Colombia globalmente
+date_default_timezone_set('America/Bogota');
+
 header('Content-Type: application/json');
 header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
 header('Pragma: no-cache');
@@ -273,14 +276,15 @@ function handleCreateCategory($db) {
     $name    = $data['name'];
     $is_req  = (int)$data['is_required'];
     $is_addon = (int)($data['is_addon'] ?? 0);
+    $show_summary = (int)($data['show_in_summary'] ?? 0);
     $max_sel = (int)$data['max_selections'];
     $order   = (int)$data['order_index'];
     $type    = !empty($data['product_type']) ? $data['product_type'] : 'ambos';
     $active  = (int)($data['is_active'] ?? 1);
     $allow_qty = (int)($data['allow_quantity'] ?? 0);
     
-    $stmt = $db->prepare("INSERT INTO categories (name, is_required, is_addon, max_selections, order_index, product_type, is_active, allow_quantity) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
-    $stmt->bind_param('siiiisii', $name, $is_req, $is_addon, $max_sel, $order, $type, $active, $allow_qty);
+    $stmt = $db->prepare("INSERT INTO categories (name, is_required, is_addon, show_in_summary, max_selections, order_index, product_type, is_active, allow_quantity) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
+    $stmt->bind_param('siiiiisii', $name, $is_req, $is_addon, $show_summary, $max_sel, $order, $type, $active, $allow_qty);
     $stmt->execute();
     $category_id = $stmt->insert_id;
 
@@ -297,6 +301,7 @@ function handleUpdateCategory($db, $id) {
     $name    = $data['name'] ?? '';
     $is_req  = (int)($data['is_required'] ?? 0);
     $is_addon = (int)($data['is_addon'] ?? 0);
+    $show_summary = (int)($data['show_in_summary'] ?? 0);
     $max_sel = (int)($data['max_selections'] ?? 1);
     $order   = (int)($data['order_index'] ?? 0);
     $type    = !empty($data['product_type']) ? $data['product_type'] : 'ambos';
@@ -304,8 +309,8 @@ function handleUpdateCategory($db, $id) {
     $allow_qty = (int)($data['allow_quantity'] ?? 0);
     $id_int  = (int)$id;
 
-    $stmt = $db->prepare("UPDATE categories SET name=?, is_required=?, is_addon=?, max_selections=?, order_index=?, product_type=?, is_active=?, allow_quantity=? WHERE id=?");
-    $stmt->bind_param('siiiisiii', $name, $is_req, $is_addon, $max_sel, $order, $type, $active, $allow_qty, $id_int);
+    $stmt = $db->prepare("UPDATE categories SET name=?, is_required=?, is_addon=?, show_in_summary=?, max_selections=?, order_index=?, product_type=?, is_active=?, allow_quantity=? WHERE id=?");
+    $stmt->bind_param('siiiiisiii', $name, $is_req, $is_addon, $show_summary, $max_sel, $order, $type, $active, $allow_qty, $id_int);
     $stmt->execute();
 
     // Sincronizar variaciones
@@ -607,7 +612,7 @@ function handlePrintOrder($db, $id) {
     $itemsResult = $db->query("SELECT oi.id, oi.product_type, oi.variation_name, oi.item_total FROM order_items oi WHERE oi.order_id = $id");
     $items = [];
     while ($item = $itemsResult->fetch_assoc()) {
-        $optsResult = $db->query("SELECT opt.name, oio.quantity FROM order_item_options oio JOIN options opt ON oio.option_id = opt.id WHERE oio.order_item_id = " . (int)$item['id']);
+        $optsResult = $db->query("SELECT opt.id, opt.name, opt.category_id, oio.quantity FROM order_item_options oio JOIN options opt ON oio.option_id = opt.id WHERE oio.order_item_id = " . (int)$item['id']);
         $item['options'] = $optsResult->fetch_all(MYSQLI_ASSOC);
         $items[] = $item;
     }
@@ -725,7 +730,53 @@ function handlePrintOrder($db, $id) {
                         <p style='font-size:13px;font-weight:900;text-transform:uppercase;color:#555;'>Total</p>
                         <p style='font-size:24px;font-weight:900;line-height:1;'>\$" . number_format($order['total']) . "</p>
                     </div>
-                </div>
+                </div>";
+    
+    // Obtener categorías marcadas como "show_in_summary"
+    $summaryCategories = $db->query("SELECT id, name FROM categories WHERE show_in_summary = 1")->fetch_all(MYSQLI_ASSOC);
+    
+    if (!empty($summaryCategories)) {
+        $summaryItems = [];
+        
+        foreach ($summaryCategories as $cat) {
+            $categoryOptions = [];
+            
+            // Buscar opciones de esta categoría en todos los items del pedido
+            foreach ($items as $item) {
+                foreach ($item['options'] as $opt) {
+                    if ($opt['category_id'] == $cat['id']) {
+                        $qtyLabel = ($opt['quantity'] > 1) ? " x{$opt['quantity']}" : "";
+                        $categoryOptions[] = $opt['name'] . $qtyLabel;
+                    }
+                }
+            }
+            
+            if (!empty($categoryOptions)) {
+                $summaryItems[] = [
+                    'category' => strtoupper($cat['name']),
+                    'options' => array_unique($categoryOptions)
+                ];
+            }
+        }
+        
+        if (!empty($summaryItems)) {
+            echo "
+                <div style='margin-top:8px;padding:8px;background:#e3f2fd;border:2px solid #2196f3;border-radius:4px;'>
+                    <p style='font-size:14px;font-weight:900;text-transform:uppercase;color:#1565c0;margin-bottom:4px;'>📋 RESUMEN:</p>";
+            
+            foreach ($summaryItems as $item) {
+                echo "
+                    <p style='font-size:15px;font-weight:700;color:#1976d2;margin-bottom:2px;'>
+                        <span style='font-weight:900;'>{$item['category']}:</span> " . implode(', ', $item['options']) . "
+                    </p>";
+            }
+            
+            echo "
+                </div>";
+        }
+    }
+    
+    echo "
             </div>
 
             <!-- DETALLE DEL PEDIDO -->
@@ -735,6 +786,8 @@ function handlePrintOrder($db, $id) {
 
     // Contar items por tipo de producto
     $productCounts = [];
+    $customerName = strtoupper($order['customer_name']);
+    
     foreach ($items as $item) {
         $productName = strtoupper($item['product_type']);
         
@@ -744,7 +797,7 @@ function handlePrintOrder($db, $id) {
         }
         $productCounts[$productName]++;
         $itemNumber = str_pad($productCounts[$productName], 2, '0', STR_PAD_LEFT);
-        $productLabel = "{$productName} #{$itemNumber}";
+        $productLabel = "{$productName} #{$itemNumber} — {$customerName}";
         
         $variationLabel = !empty($item['variation_name'])
             ? ' — ' . strtoupper($item['variation_name'])

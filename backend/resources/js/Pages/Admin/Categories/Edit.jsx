@@ -13,6 +13,7 @@ export default function Edit({ category, variations = {} }) {
     product_type: category.product_type || 'ambos',
     is_required: category.is_required ?? false,
     is_addon: category.is_addon ?? false,
+    show_in_summary: category.show_in_summary ?? false,
     max_selections: category.max_selections || 1,
     order_index: category.order_index || 1,
     // Pre-marcar las variaciones ya asignadas
@@ -121,6 +122,17 @@ export default function Edit({ category, variations = {} }) {
               className="w-5 h-5 rounded border-gray-300"
             />
             <span className="font-semibold">Es adicional (se puede excluir al duplicar)</span>
+          </label>
+
+          {/* Mostrar en resumen */}
+          <label className="flex items-center space-x-3 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={data.show_in_summary}
+              onChange={(e) => setData('show_in_summary', e.target.checked)}
+              className="w-5 h-5 rounded border-gray-300"
+            />
+            <span className="font-semibold">Mostrar en resumen del pedido (aparece arriba junto al cliente)</span>
           </label>
 
           {/* ── Variaciones de Producto ──────────────────────────────── */}

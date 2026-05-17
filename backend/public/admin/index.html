@@ -346,7 +346,7 @@
                     <textarea name="description" class="w-full p-4 bg-gray-50 rounded-2xl border-2 border-transparent focus:border-red-600 outline-none transition-all font-medium text-sm h-24" placeholder="Describe este tipo de comida...">${type ? type.description : ''}</textarea>
                 </div>
                 <div class="flex items-center gap-2 py-2">
-                    <input type="checkbox" name="is_active" id="type_active" ${(!type || type.is_active) ? 'checked' : ''} class="w-4 h-4 rounded border-gray-300 accent-red-600">
+                    <input type="checkbox" name="is_active" id="type_active" ${type && Number(type.is_active) === 1 ? 'checked' : ''} class="w-4 h-4 rounded border-gray-300 accent-red-600">
                     <label for="type_active" class="text-sm font-bold text-gray-700 cursor-pointer">Módulo Activo (Visible para clientes)</label>
                 </div>
                 <button type="submit" class="w-full py-4 bg-red-600 text-white rounded-2xl font-black shadow-xl hover:bg-red-700 transition-all uppercase mt-4">Guardar Módulo</button>
@@ -581,7 +581,8 @@
 
         return orders.filter(o => {
             if (!o.created_at) return currentDateFilter === 'all';
-            const d = new Date(o.created_at.replace(' ', 'T'));
+            // Convertir fecha UTC a hora de Colombia (UTC-5)
+            const d = new Date(o.created_at.replace(' ', 'T') + 'Z'); // Agregar Z para indicar UTC
             if (isNaN(d)) return currentDateFilter === 'all';
             if (currentDateFilter === 'today')     return d >= todayStart;
             if (currentDateFilter === 'yesterday') return d >= yesterdayStart && d < todayStart;
@@ -701,7 +702,7 @@
 
         if (currentDateFilter === 'yesterday') {
             statsOrders = allOrders.filter(o => {
-                const d = new Date(o.created_at.replace(' ', 'T'));
+                const d = new Date(o.created_at.replace(' ', 'T') + 'Z'); // UTC
                 return d >= yStart && d < tStart;
             });
             labelText = 'Ayer';
@@ -709,7 +710,7 @@
             // Por defecto (hoy, semana, todos), mostramos estadísticas de HOY para control diario
             statsOrders = allOrders.filter(o => {
                 if (!o.created_at) return false;
-                return new Date(o.created_at.replace(' ', 'T')) >= tStart;
+                return new Date(o.created_at.replace(' ', 'T') + 'Z') >= tStart; // UTC
             });
             labelText = 'Hoy';
         }
@@ -935,7 +936,7 @@
                 </div>
 
                 <div class="flex items-center gap-3 py-2">
-                    <input type="checkbox" name="is_active" id="var_is_active" ${(!v || Number(v.is_active) === 1) ? 'checked' : ''} class="w-5 h-5 rounded-lg accent-green-600">
+                    <input type="checkbox" name="is_active" id="var_is_active" ${v && Number(v.is_active) === 1 ? 'checked' : ''} class="w-5 h-5 rounded-lg accent-green-600">
                     <label for="var_is_active" class="text-sm font-bold text-gray-600">Variación Activa</label>
                 </div>
 
@@ -1170,11 +1171,15 @@
                     <label for="is_addon" class="text-sm font-bold text-gray-600">Es adicional (se puede excluir al duplicar)</label>
                 </div>
                 <div class="flex items-center gap-3 py-2">
-                    <input type="checkbox" name="allow_quantity" id="allow_qty" ${cat?.allow_quantity == 1 ? 'checked' : ''} class="w-5 h-5 rounded-lg accent-blue-600">
+                    <input type="checkbox" name="show_in_summary" id="show_in_summary" ${Number(cat?.show_in_summary) === 1 ? 'checked' : ''} class="w-5 h-5 rounded-lg accent-purple-600">
+                    <label for="show_in_summary" class="text-sm font-bold text-gray-600">Mostrar en resumen del pedido (aparece arriba junto al cliente)</label>
+                </div>
+                <div class="flex items-center gap-3 py-2">
+                    <input type="checkbox" name="allow_quantity" id="allow_qty" ${Number(cat?.allow_quantity) === 1 ? 'checked' : ''} class="w-5 h-5 rounded-lg accent-blue-600">
                     <label for="allow_qty" class="text-sm font-bold text-gray-600">Permitir cantidades (Contador +/-)</label>
                 </div>
                 <div class="flex items-center gap-3 py-2 border-t mt-2 pt-4">
-                    <input type="checkbox" name="is_active" id="is_active_cat" ${(!cat || Number(cat.is_active) === 1) ? 'checked' : ''} class="w-5 h-5 rounded-lg">
+                    <input type="checkbox" name="is_active" id="is_active_cat" ${cat && Number(cat.is_active) === 1 ? 'checked' : ''} class="w-5 h-5 rounded-lg">
                     <label for="is_active_cat" class="text-sm font-black text-red-600 uppercase tracking-widest">Categoría Activa</label>
                 </div>
 
@@ -1231,6 +1236,7 @@
             const data = Object.fromEntries(formData);
             data.is_required = formData.get('is_required') === 'on' ? 1 : 0;
             data.is_addon = formData.get('is_addon') === 'on' ? 1 : 0;
+            data.show_in_summary = formData.get('show_in_summary') === 'on' ? 1 : 0;
             data.is_active   = formData.get('is_active')   === 'on' ? 1 : 0;
             data.allow_quantity = formData.get('allow_quantity') === 'on' ? 1 : 0;
             
@@ -1331,7 +1337,7 @@
                     <input type="number" name="price" value="${opt ? opt.price : 0}" required class="w-full p-4 bg-gray-50 rounded-2xl border-2 border-transparent focus:border-red-600 outline-none font-bold">
                 </div>
                 <div class="flex items-center gap-3 py-2">
-                    <input type="checkbox" name="is_active" id="is_act" ${(!opt || Number(opt.is_active) !== 0) ? 'checked' : ''} class="w-5 h-5 rounded-lg">
+                    <input type="checkbox" name="is_active" id="is_act" ${opt && Number(opt.is_active) === 1 ? 'checked' : ''} class="w-5 h-5 rounded-lg">
                     <label for="is_act" class="text-sm font-bold text-gray-600">Disponible (Activo)</label>
                 </div>
                 <div class="flex gap-4 pt-4">
@@ -1395,6 +1401,43 @@
                               'Retira en el local'}
                         </div>
                         ${order.observations ? `<div class="mt-2 p-2 bg-yellow-50 border-l-2 border-yellow-400 rounded"><p class="text-[10px] font-black text-yellow-700 uppercase">📝 Observaciones:</p><p class="text-xs font-bold text-yellow-800">${order.observations}</p></div>` : ''}
+                        ${(() => {
+                            // Generar resumen de categorías marcadas como show_in_summary
+                            const summaryCategories = dataCache.categories.filter(c => c.show_in_summary === 1 || c.show_in_summary === '1');
+                            if (summaryCategories.length === 0) return '';
+                            
+                            const summaryItems = [];
+                            summaryCategories.forEach(cat => {
+                                const categoryOptions = [];
+                                order.items.forEach(item => {
+                                    item.options.forEach(opt => {
+                                        const option = dataCache.options.find(o => o.name === opt.name);
+                                        if (option && option.category_id == cat.id) {
+                                            const qtyLabel = opt.quantity > 1 ? ` x${opt.quantity}` : '';
+                                            categoryOptions.push(opt.name + qtyLabel);
+                                        }
+                                    });
+                                });
+                                
+                                if (categoryOptions.length > 0) {
+                                    summaryItems.push({
+                                        category: cat.name.toUpperCase(),
+                                        options: [...new Set(categoryOptions)]
+                                    });
+                                }
+                            });
+                            
+                            if (summaryItems.length === 0) return '';
+                            
+                            return `<div class="mt-2 p-2 bg-blue-50 border-l-2 border-blue-400 rounded">
+                                <p class="text-[10px] font-black text-blue-700 uppercase mb-1">📋 Resumen:</p>
+                                ${summaryItems.map(item => `
+                                    <p class="text-xs font-bold text-blue-800">
+                                        <span class="font-black">${item.category}:</span> ${item.options.join(', ')}
+                                    </p>
+                                `).join('')}
+                            </div>`;
+                        })()}
                     </div>
                     <div class="text-right">
                         <p class="text-[9px] font-black text-red-400 uppercase">Total</p>

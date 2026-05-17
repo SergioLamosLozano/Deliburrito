@@ -9,11 +9,12 @@ class Category extends Model
 {
     use HasFactory;
 
-    protected $fillable = ['name', 'product_type', 'is_required', 'is_addon', 'max_selections', 'order_index', 'is_active', 'allow_quantity'];
+    protected $fillable = ['name', 'product_type', 'is_required', 'is_addon', 'show_in_summary', 'max_selections', 'order_index', 'is_active', 'allow_quantity'];
 
     protected $casts = [
         'is_required'    => 'boolean',
         'is_addon'       => 'boolean',
+        'show_in_summary' => 'boolean',
         'is_active'      => 'boolean',
         'allow_quantity' => 'boolean',
     ];
