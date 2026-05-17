@@ -527,9 +527,10 @@ function handleCreateOrder($db) {
     $customer_address = $data['customer_address'] ?? '';
     $table_number = $data['table_number'] ?? null;
     $delivery_type = $data['delivery_type'] ?? 'local';
+    $observations = $data['observations'] ?? null;
 
-    $stmt = $db->prepare("INSERT INTO orders (customer_name, customer_phone, customer_address, table_number, delivery_type, subtotal, delivery_cost, total, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pendiente', NOW(), NOW())");
-    $stmt->bind_param('sssssdds', $customer_name, $customer_phone, $customer_address, $table_number, $delivery_type, $subtotal, $delivery_cost, $total);
+    $stmt = $db->prepare("INSERT INTO orders (customer_name, customer_phone, customer_address, table_number, delivery_type, observations, subtotal, delivery_cost, total, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'pendiente', NOW(), NOW())");
+    $stmt->bind_param('ssssssdds', $customer_name, $customer_phone, $customer_address, $table_number, $delivery_type, $observations, $subtotal, $delivery_cost, $total);
     $stmt->execute();
     $order_id = $stmt->insert_id;
 
@@ -611,8 +612,15 @@ function handlePrintOrder($db, $id) {
         $items[] = $item;
     }
 
-    $fecha = date('d/m/Y', strtotime($order['created_at']));
-    $hora = date('H:i', strtotime($order['created_at']));
+    // Configurar zona horaria de Colombia y convertir desde UTC
+    date_default_timezone_set('America/Bogota');
+    
+    // Crear objeto DateTime desde UTC y convertir a Colombia
+    $dt = new DateTime($order['created_at'], new DateTimeZone('UTC'));
+    $dt->setTimezone(new DateTimeZone('America/Bogota'));
+    
+    $fecha = $dt->format('d/m/Y');
+    $hora = $dt->format('h:i A');
 
     echo "
     <!DOCTYPE html>
@@ -686,13 +694,13 @@ function handlePrintOrder($db, $id) {
 
             <!-- ENCABEZADO -->
             <div class='no-cortar text-center border-b-2 border-black pb-2 mb-2'>
-                <p style='font-size:20px;font-weight:900;text-transform:uppercase;letter-spacing:0.1em;line-height:1;'>Deli Burrito</p>
-                <p style='font-size:18px;font-weight:700;text-transform:uppercase;letter-spacing:-0.02em;'>Comanda #$id</p>
-                <p style='font-size:11px;font-weight:700;margin-top:2px;'>$fecha &nbsp;·&nbsp; $hora</p>
+                <p style='font-size:24px;font-weight:900;text-transform:uppercase;letter-spacing:0.1em;line-height:1;'>Deli Burrito</p>
+                <p style='font-size:22px;font-weight:700;text-transform:uppercase;letter-spacing:-0.02em;'>Comanda #$id</p>
+                <p style='font-size:13px;font-weight:700;margin-top:2px;'>$fecha &nbsp;·&nbsp; $hora</p>
             </div>
 
             <!-- DATOS DEL CLIENTE -->
-            <div class='no-cortar border-b border-dashed border-black pb-2 mb-2' style='font-size:13px;'>
+            <div class='no-cortar border-b border-dashed border-black pb-2 mb-2' style='font-size:16px;'>
                 <div style='display:flex;justify-content:space-between;align-items:flex-start;'>
                     <div style='line-height:1.5;'>
                         <p><span style='font-weight:900;text-transform:uppercase;background:#000;color:#fff;padding:0 4px;margin-right:4px;'>Cliente</span>{$order['customer_name']}</p>
@@ -714,28 +722,39 @@ function handlePrintOrder($db, $id) {
                         <p><span style='font-weight:900;text-transform:uppercase;'>Entrega:</span> " . strtoupper($order['delivery_type']) . "</p>
                     </div>
                     <div style='text-align:right;'>
-                        <p style='font-size:11px;font-weight:900;text-transform:uppercase;color:#555;'>Total</p>
-                        <p style='font-size:20px;font-weight:900;line-height:1;'>\$" . number_format($order['total']) . "</p>
+                        <p style='font-size:13px;font-weight:900;text-transform:uppercase;color:#555;'>Total</p>
+                        <p style='font-size:24px;font-weight:900;line-height:1;'>\$" . number_format($order['total']) . "</p>
                     </div>
                 </div>
             </div>
 
             <!-- DETALLE DEL PEDIDO -->
             <div class='border-b border-black pb-2 mb-2'>
-                <p style='font-size:13px;font-weight:900;text-align:center;text-transform:uppercase;text-decoration:underline;text-underline-offset:2px;letter-spacing:0.1em;margin-bottom:6px;'>Preparación</p>
+                <p style='font-size:16px;font-weight:900;text-align:center;text-transform:uppercase;text-decoration:underline;text-underline-offset:2px;letter-spacing:0.1em;margin-bottom:6px;'>Preparación</p>
                 ";
 
+    // Contar items por tipo de producto
+    $productCounts = [];
     foreach ($items as $item) {
-        $productName    = strtoupper($item['product_type']);
+        $productName = strtoupper($item['product_type']);
+        
+        // Incrementar contador para este tipo de producto
+        if (!isset($productCounts[$productName])) {
+            $productCounts[$productName] = 0;
+        }
+        $productCounts[$productName]++;
+        $itemNumber = str_pad($productCounts[$productName], 2, '0', STR_PAD_LEFT);
+        $productLabel = "{$productName} #{$itemNumber}";
+        
         $variationLabel = !empty($item['variation_name'])
             ? ' — ' . strtoupper($item['variation_name'])
             : '';
         echo "
                 <div class='no-cortar mb-2'>
-                    <div style='background:#000;color:#fff;font-weight:900;font-size:14px;padding:3px 6px;text-transform:uppercase;letter-spacing:0.05em;'>
-                        1x {$productName}{$variationLabel}
+                    <div style='background:#000;color:#fff;font-weight:900;font-size:17px;padding:3px 6px;text-transform:uppercase;letter-spacing:0.05em;'>
+                        {$productLabel}{$variationLabel}
                     </div>
-                    <ul style='margin-top:3px;font-size:14px;font-weight:700;padding-left:8px;line-height:1.5;'>
+                    <ul style='margin-top:3px;font-size:17px;font-weight:700;padding-left:8px;line-height:1.5;'>
         ";
         foreach ($item['options'] as $opt) {
             $qLabel = ($opt['quantity'] > 1) ? " (x{$opt['quantity']})" : "";
@@ -750,11 +769,23 @@ function handlePrintOrder($db, $id) {
     }
 
     echo "
-            </div>
+            </div>";
+    
+    // Mostrar observaciones antes del total si existen
+    if (!empty($order['observations'])) {
+        echo "
+            <!-- OBSERVACIONES -->
+            <div class='no-cortar' style='margin-top:4px;margin-bottom:4px;padding:8px;background:#fff3cd;border:2px solid #ffc107;border-radius:4px;'>
+                <p style='font-size:15px;font-weight:900;text-transform:uppercase;color:#856404;margin-bottom:4px;'>📝 OBSERVACIONES:</p>
+                <p style='font-size:16px;font-weight:700;color:#856404;line-height:1.4;'>{$order['observations']}</p>
+            </div>";
+    }
+    
+    echo "
 
             <!-- TOTAL -->
             <div class='no-cortar' style='text-align:right;margin-top:4px;'>
-                <p style='font-size:20px;font-weight:900;'>TOTAL: \$" . number_format($order['total']) . "</p>
+                <p style='font-size:24px;font-weight:900;'>TOTAL: \$" . number_format($order['total']) . "</p>
             </div>
 
         </div>

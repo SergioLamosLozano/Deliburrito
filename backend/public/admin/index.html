@@ -1394,6 +1394,7 @@
                               order.delivery_type === 'local' && order.table_number ? `🪑 Mesa ${order.table_number}` : 
                               'Retira en el local'}
                         </div>
+                        ${order.observations ? `<div class="mt-2 p-2 bg-yellow-50 border-l-2 border-yellow-400 rounded"><p class="text-[10px] font-black text-yellow-700 uppercase">📝 Observaciones:</p><p class="text-xs font-bold text-yellow-800">${order.observations}</p></div>` : ''}
                     </div>
                     <div class="text-right">
                         <p class="text-[9px] font-black text-red-400 uppercase">Total</p>
@@ -1410,14 +1411,23 @@
             </div>
 
             <div class="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-[42vh] overflow-y-auto pr-2 custom-scrollbar">
-                ${order.items.map(item => `
+                ${(() => {
+                    // Contar items por tipo de producto
+                    const productCounts = {};
+                    return order.items.map(item => {
+                        const productType = item.product_type.toUpperCase();
+                        productCounts[productType] = (productCounts[productType] || 0) + 1;
+                        const itemNumber = String(productCounts[productType]).padStart(2, '0');
+                        const productLabel = `${productType} #${itemNumber}`;
+                        
+                        return `
                     <div class="bg-white rounded-2xl p-4 border-2 border-gray-100 shadow-sm hover:border-red-200 transition-colors">
                         <div class="flex justify-between items-center mb-3 border-b-2 border-dashed border-gray-100 pb-2">
                             <div>
+                                <span class="inline-block bg-red-600 text-white px-2 py-1 rounded-lg text-xs font-black mr-2">${productLabel}</span>
                                 <span class="text-lg font-black text-gray-800 uppercase tracking-tight">${item.product_type}</span>
                                 ${item.variation_name ? `<span class="ml-2 px-2 py-0.5 bg-orange-100 text-orange-700 rounded-full text-[10px] font-black uppercase tracking-wide">${item.variation_name}</span>` : ''}
                             </div>
-                            <span class="bg-red-600 text-white px-2 py-0.5 rounded-lg font-black text-[10px] uppercase">X1</span>
                         </div>
                         <ul class="space-y-2">
                             ${item.options.map(opt => `
@@ -1437,7 +1447,8 @@
                             </div>
                         ` : ''}
                     </div>
-                `).join('')}
+                `}).join('');
+                })()}
             </div>
 
             <div class="mt-4 pt-4 border-t flex gap-3">

@@ -13,6 +13,7 @@ export default function Checkout({ cartItems, onBack, onSuccess, onRemoveItem, o
     customer_address: '',
     table_number: '',
     delivery_type: 'domicilio',
+    observations: '',
   });
 
   const [loading, setLoading] = useState(false);
@@ -35,6 +36,14 @@ export default function Checkout({ cartItems, onBack, onSuccess, onRemoveItem, o
   const deliveryCost = formData.delivery_type === 'domicilio' ? dbSettings.costo_domicilio : 0;
   const total = subtotal + deliveryCost;
 
+  // Generar numeración por tipo de producto
+  const getItemNumber = (item, index) => {
+    const itemsOfSameType = cartItems.filter((i, idx) => 
+      idx <= index && i.product_type === item.product_type
+    );
+    return itemsOfSameType.length;
+  };
+
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
@@ -54,6 +63,7 @@ export default function Checkout({ cartItems, onBack, onSuccess, onRemoveItem, o
         customer_address: formData.customer_address,
         table_number: formData.table_number,
         delivery_type: formData.delivery_type,
+        observations: formData.observations,
         items: cartItems,
       };
 
@@ -101,11 +111,18 @@ export default function Checkout({ cartItems, onBack, onSuccess, onRemoveItem, o
                 {cartItems.length === 0 ? (
                     <p className="text-gray-400 font-bold text-center py-4 italic">El carrito está vacío</p>
                 ) : (
-                    cartItems.map((item, idx) => (
+                    cartItems.map((item, idx) => {
+                        const itemNumber = getItemNumber(item, idx);
+                        const productLabel = `${item.product_type.toUpperCase()} #${String(itemNumber).padStart(2, '0')}`;
+                        
+                        return (
                         <div key={item.id} className="relative group bg-gray-50 p-4 rounded-3xl border border-transparent hover:border-red-100 transition-all">
                         <div className="flex justify-between items-start gap-2">
                             <div className="flex-1">
-                                <p className="font-black text-gray-800 text-sm leading-tight mb-1">{item.display_name}</p>
+                                <p className="font-black text-gray-800 text-sm leading-tight mb-1">
+                                    <span className="inline-block bg-red-600 text-white px-2 py-0.5 rounded-lg text-[10px] mr-2">{productLabel}</span>
+                                    {item.display_name}
+                                </p>
                                 <p className="text-[10px] text-gray-500 line-clamp-2">{item.selection_summary}</p>
                                 <p className="text-red-600 font-black text-sm mt-2">${(parseFloat(item.item_total) || 0).toLocaleString()}</p>
                             </div>
@@ -127,7 +144,7 @@ export default function Checkout({ cartItems, onBack, onSuccess, onRemoveItem, o
                             </div>
                         </div>
                         </div>
-                    ))
+                    )})
                 )}
                 </div>
 
@@ -240,6 +257,18 @@ export default function Checkout({ cartItems, onBack, onSuccess, onRemoveItem, o
                     </div>
                     </div>
                 )}
+
+                <div>
+                    <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 ml-2">Observaciones (opcional)</label>
+                    <textarea
+                        name="observations"
+                        value={formData.observations}
+                        onChange={handleChange}
+                        rows="3"
+                        className="w-full p-4 bg-gray-50 border-2 border-gray-100 rounded-2xl focus:border-red-600 outline-none transition-all font-bold resize-none"
+                        placeholder="Ej: Sin cebolla, extra picante, etc."
+                    />
+                </div>
 
                 {error && <div className="p-4 bg-red-50 text-red-600 rounded-2xl text-sm font-bold border border-red-100">{error}</div>}
 
