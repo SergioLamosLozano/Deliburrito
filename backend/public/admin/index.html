@@ -195,6 +195,34 @@
                         <label class="block text-xs font-black text-gray-400 uppercase mb-2">Costo de Domicilio</label>
                         <input type="number" id="costoDomicilioInput" class="w-full p-4 bg-gray-50 rounded-2xl border-2 border-transparent focus:border-red-600 outline-none transition-all font-bold text-lg">
                     </div>
+                    
+                    <div class="border-t-2 border-dashed border-gray-200 pt-6">
+                        <h4 class="text-lg font-black mb-4 text-gray-800 uppercase">Mensajes de Notificación</h4>
+                        <p class="text-xs text-gray-500 mb-4">Personaliza el mensaje adicional que se envía a los clientes. El mensaje base es fijo.</p>
+                        
+                        <div class="space-y-4">
+                            <div>
+                                <label class="block text-xs font-black text-gray-400 uppercase mb-2">Mensaje Adicional - Pedido Aceptado</label>
+                                <div class="bg-gray-50 p-3 rounded-xl mb-2 border border-gray-200">
+                                    <p class="text-[10px] font-bold text-gray-500 mb-1">MENSAJE BASE (fijo):</p>
+                                    <p class="text-xs text-gray-700 italic">Hola {nombre}, tu pedido con identificador #{numero} ha sido aceptado y está en preparación.</p>
+                                </div>
+                                <textarea id="mensajeAceptadoInput" rows="2" class="w-full p-4 bg-gray-50 rounded-2xl border-2 border-transparent focus:border-green-600 outline-none transition-all font-bold text-sm resize-none" placeholder="Ej: ¡Gracias por elegir Deli Burrito!"></textarea>
+                                <p class="text-[10px] text-gray-400 mt-1 ml-2">Este texto se agregará al final del mensaje base.</p>
+                            </div>
+                            
+                            <div>
+                                <label class="block text-xs font-black text-gray-400 uppercase mb-2">Mensaje Adicional - Pedido Cancelado</label>
+                                <div class="bg-gray-50 p-3 rounded-xl mb-2 border border-gray-200">
+                                    <p class="text-[10px] font-bold text-gray-500 mb-1">MENSAJE BASE (fijo):</p>
+                                    <p class="text-xs text-gray-700 italic">Hola {nombre}, lamentamos informarte que tu pedido #{numero} ha sido cancelado.</p>
+                                </div>
+                                <textarea id="mensajeCanceladoInput" rows="2" class="w-full p-4 bg-gray-50 rounded-2xl border-2 border-transparent focus:border-red-600 outline-none transition-all font-bold text-sm resize-none" placeholder="Ej: Disculpa las molestias."></textarea>
+                                <p class="text-[10px] text-gray-400 mt-1 ml-2">Este texto se agregará al final del mensaje base.</p>
+                            </div>
+                        </div>
+                    </div>
+                    
                     <button onclick="saveSettings()" class="w-full py-4 bg-gray-900 text-white rounded-2xl font-black hover:bg-gray-800 transition-all shadow-xl">GUARDAR AJUSTES</button>
                 </div>
             </div>
@@ -633,8 +661,17 @@
             renderOptions();
         } else if (currentView === 'settings') {
             const delivery = data.find(s => s.key === 'costo_domicilio');
+            const msgAceptado = data.find(s => s.key === 'mensaje_pedido_aceptado');
+            const msgCancelado = data.find(s => s.key === 'mensaje_pedido_cancelado');
+            
             if (delivery) {
                 document.getElementById('costoDomicilioInput').value = delivery.value;
+            }
+            if (msgAceptado) {
+                document.getElementById('mensajeAceptadoInput').value = msgAceptado.value;
+            }
+            if (msgCancelado) {
+                document.getElementById('mensajeCanceladoInput').value = msgCancelado.value;
             }
         }
         lastUpdate = new Date();
@@ -1000,13 +1037,29 @@
     // --- MODALS ---
 
     function openCategoryModal(cat = null) {
-        // Asegurar que las variaciones estén cargadas para los checkboxes
+        // Asegurar que las variaciones Y los tipos de producto estén cargados
         const doOpen = () => _openCategoryModalInner(cat);
+        
+        const promises = [];
+        
         if (dataCache.variations.length === 0) {
-            fetch(`${apiBase}/admin-api.php?route=variations`)
-                .then(r => r.json())
-                .then(data => { dataCache.variations = Array.isArray(data) ? data : []; doOpen(); })
-                .catch(doOpen);
+            promises.push(
+                fetch(`${apiBase}/admin-api.php?route=variations`)
+                    .then(r => r.json())
+                    .then(data => { dataCache.variations = Array.isArray(data) ? data : []; })
+            );
+        }
+        
+        if (!dataCache.productTypes || dataCache.productTypes.length === 0) {
+            promises.push(
+                fetch(`${apiBase}/admin-api.php?route=product-types`)
+                    .then(r => r.json())
+                    .then(data => { dataCache.productTypes = Array.isArray(data) ? data : []; })
+            );
+        }
+        
+        if (promises.length > 0) {
+            Promise.all(promises).then(doOpen).catch(doOpen);
         } else {
             doOpen();
         }
@@ -1113,6 +1166,10 @@
                     <label for="is_req" class="text-sm font-bold text-gray-600">Es obligatorio</label>
                 </div>
                 <div class="flex items-center gap-3 py-2">
+                    <input type="checkbox" name="is_addon" id="is_addon" ${Number(cat?.is_addon) === 1 ? 'checked' : ''} class="w-5 h-5 rounded-lg accent-orange-600">
+                    <label for="is_addon" class="text-sm font-bold text-gray-600">Es adicional (se puede excluir al duplicar)</label>
+                </div>
+                <div class="flex items-center gap-3 py-2">
                     <input type="checkbox" name="allow_quantity" id="allow_qty" ${cat?.allow_quantity == 1 ? 'checked' : ''} class="w-5 h-5 rounded-lg accent-blue-600">
                     <label for="allow_qty" class="text-sm font-bold text-gray-600">Permitir cantidades (Contador +/-)</label>
                 </div>
@@ -1173,8 +1230,14 @@
             const formData = new FormData(e.target);
             const data = Object.fromEntries(formData);
             data.is_required = formData.get('is_required') === 'on' ? 1 : 0;
+            data.is_addon = formData.get('is_addon') === 'on' ? 1 : 0;
             data.is_active   = formData.get('is_active')   === 'on' ? 1 : 0;
             data.allow_quantity = formData.get('allow_quantity') === 'on' ? 1 : 0;
+            
+            // Asegurar que product_type tenga un valor válido
+            if (!data.product_type || data.product_type === '' || data.product_type === '0') {
+                data.product_type = 'ambos';
+            }
             
             // Recoger configuración detallada de variaciones (ID + Máximo override)
             const variationCheckboxes = e.target.querySelectorAll('input[name="variation_ids"]:checked');
@@ -1203,9 +1266,48 @@
     }
 
     function openOptionModal(opt = null) {
+        // Asegurar que las categorías estén cargadas antes de abrir el modal
+        const doOpen = () => _openOptionModalInner(opt);
+        
+        if (!dataCache.categories || dataCache.categories.length === 0) {
+            fetch(`${apiBase}/admin-api.php?route=categories`)
+                .then(r => r.json())
+                .then(data => { 
+                    dataCache.categories = Array.isArray(data) ? data : []; 
+                    doOpen(); 
+                })
+                .catch(() => {
+                    showToast('Error al cargar categorías', 'error');
+                    doOpen(); // Abrir de todos modos para mostrar el error
+                });
+        } else {
+            doOpen();
+        }
+    }
+
+    function _openOptionModalInner(opt = null) {
         const overlay = document.getElementById('modalOverlay');
         const content = document.getElementById('modalContent');
         content.className = "bg-white w-full max-w-lg rounded-3xl shadow-2xl overflow-y-auto p-8 max-h-[95vh] custom-scrollbar";
+        
+        // Verificar que haya categorías disponibles
+        if (!dataCache.categories || dataCache.categories.length === 0) {
+            content.innerHTML = `
+                <div class="flex justify-between items-center mb-6">
+                    <h3 class="text-2xl font-black uppercase">Error</h3>
+                    <button onclick="closeModal()" class="text-gray-400 hover:text-red-600 transition-colors text-2xl leading-none">&times;</button>
+                </div>
+                <div class="text-center py-8">
+                    <p class="text-red-600 font-bold mb-4">⚠️ No hay categorías disponibles</p>
+                    <p class="text-gray-500 text-sm mb-6">Debes crear al menos una categoría antes de agregar ingredientes.</p>
+                    <button onclick="closeModal(); switchView('categories')" class="bg-red-600 text-white px-6 py-3 rounded-2xl font-black">
+                        IR A CATEGORÍAS
+                    </button>
+                </div>
+            `;
+            overlay.classList.remove('hidden');
+            return;
+        }
         
         content.innerHTML = `
             <div class="flex justify-between items-center mb-6">
@@ -1248,7 +1350,7 @@
             const id = data.id;
             const url = id ? `${apiBase}/admin-api.php?route=options/${id}` : `${apiBase}/admin-api.php?route=options`;
             
-            await fetch(url, { method: 'POST', body: JSON.stringify(data) });
+            await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
             showToast(id ? 'Ingrediente actualizado' : 'Ingrediente creado');
             closeModal();
             loadViewData();
@@ -1284,11 +1386,13 @@
                 <div class="md:col-span-2 bg-red-50 rounded-2xl p-4 border border-red-100 flex items-center justify-between">
                     <div>
                         <div class="flex items-center gap-2 mb-0.5">
-                            <span class="text-lg">${order.delivery_type === 'domicilio' ? '🛵' : '🥡'}</span>
+                            <span class="text-lg">${order.delivery_type === 'domicilio' ? '🛵' : order.delivery_type === 'local' ? '🍽️' : '🥡'}</span>
                             <span class="font-black uppercase tracking-[0.2em] text-red-700 text-[9px]">${order.delivery_type}</span>
                         </div>
                         <div class="text-base font-black text-gray-800 uppercase tracking-tighter">
-                            ${order.customer_address ? `📍 ${order.customer_address}` : 'Retira en el local'}
+                            ${order.delivery_type === 'domicilio' && order.customer_address ? `📍 ${order.customer_address}` : 
+                              order.delivery_type === 'local' && order.table_number ? `🪑 Mesa ${order.table_number}` : 
+                              'Retira en el local'}
                         </div>
                     </div>
                     <div class="text-right">
@@ -1369,13 +1473,32 @@
     };
 
     async function saveSettings() {
-        const val = document.getElementById('costoDomicilioInput').value;
-        await fetch(`${apiBase}/admin-api.php?route=settings`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ key: 'costo_domicilio', value: val })
-        });
+        const costoDomicilio = document.getElementById('costoDomicilioInput').value;
+        const mensajeAceptado = document.getElementById('mensajeAceptadoInput').value;
+        const mensajeCancelado = document.getElementById('mensajeCanceladoInput').value;
+        
+        // Guardar los tres settings
+        await Promise.all([
+            fetch(`${apiBase}/admin-api.php?route=settings`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ key: 'costo_domicilio', value: costoDomicilio })
+            }),
+            fetch(`${apiBase}/admin-api.php?route=settings`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ key: 'mensaje_pedido_aceptado', value: mensajeAceptado })
+            }),
+            fetch(`${apiBase}/admin-api.php?route=settings`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ key: 'mensaje_pedido_cancelado', value: mensajeCancelado })
+            })
+        ]);
+        
         showToast('Ajustes guardados correctamente');
+        // NO recargar para evitar que se borren los campos mientras el usuario edita
+        // loadViewData();
     }
 
     // ── Helper: construye y abre el link de WhatsApp para un pedido ──────────
@@ -1383,7 +1506,33 @@
         if (!order || !order.customer_phone) return;
         let phone = order.customer_phone.replace(/[\s\-\(\)\+]/g, '');
         if (!phone.startsWith('57')) phone = '57' + phone;
-        const texto = customText || `Hola ${order.customer_name}, tu pedido #${order.id} ha sido aceptado y está en preparación. ¡Gracias por elegir Deli Burrito!`;
+        
+        let texto = customText;
+        if (!texto) {
+            // Mensaje base fijo
+            const mensajeBase = `Hola ${order.customer_name}, tu pedido con identificador #${order.id} ha sido aceptado y está en preparación.`;
+            
+            // Obtener el mensaje adicional personalizado desde settings
+            fetch(`${apiBase}/admin-api.php?route=settings`)
+                .then(r => r.json())
+                .then(settings => {
+                    const msgSetting = settings.find(s => s.key === 'mensaje_pedido_aceptado');
+                    const mensajeAdicional = msgSetting?.value || '¡Gracias por elegir Deli Burrito!';
+                    
+                    // Combinar mensaje base + mensaje adicional
+                    texto = `${mensajeBase} ${mensajeAdicional}`;
+                    
+                    const a = document.createElement('a');
+                    a.href = `https://wa.me/${phone}?text=${encodeURIComponent(texto)}`;
+                    a.target = '_blank';
+                    a.rel = 'noopener';
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                });
+            return;
+        }
+        
         const a = document.createElement('a');
         a.href = `https://wa.me/${phone}?text=${encodeURIComponent(texto)}`;
         a.target = '_blank';
@@ -1510,7 +1659,8 @@
     setInterval(() => {
         const diff = Math.floor((new Date() - lastUpdate) / 1000);
         document.getElementById('updateTimer').textContent = `Actualizado hace: ${diff}s`;
-        if (diff > 10) loadViewData();
+        // No recargar automáticamente en Settings para permitir edición
+        if (diff > 10 && currentView !== 'settings') loadViewData();
     }, 1000);
 
     // Initial Load

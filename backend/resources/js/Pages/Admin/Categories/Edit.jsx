@@ -12,6 +12,7 @@ export default function Edit({ category, variations = {} }) {
     name: category.name || '',
     product_type: category.product_type || 'ambos',
     is_required: category.is_required ?? false,
+    is_addon: category.is_addon ?? false,
     max_selections: category.max_selections || 1,
     order_index: category.order_index || 1,
     // Pre-marcar las variaciones ya asignadas
@@ -109,6 +110,17 @@ export default function Edit({ category, variations = {} }) {
               className="w-5 h-5 rounded border-gray-300"
             />
             <span className="font-semibold">Esta categoría es requerida</span>
+          </label>
+
+          {/* Es adicional */}
+          <label className="flex items-center space-x-3 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={data.is_addon}
+              onChange={(e) => setData('is_addon', e.target.checked)}
+              className="w-5 h-5 rounded border-gray-300"
+            />
+            <span className="font-semibold">Es adicional (se puede excluir al duplicar)</span>
           </label>
 
           {/* ── Variaciones de Producto ──────────────────────────────── */}

@@ -11,6 +11,7 @@ export default function Checkout({ cartItems, onBack, onSuccess, onRemoveItem, o
     customer_name: '',
     customer_phone: '',
     customer_address: '',
+    table_number: '',
     delivery_type: 'domicilio',
   });
 
@@ -51,6 +52,7 @@ export default function Checkout({ cartItems, onBack, onSuccess, onRemoveItem, o
         customer_name: formData.customer_name,
         customer_phone: formData.customer_phone,
         customer_address: formData.customer_address,
+        table_number: formData.table_number,
         delivery_type: formData.delivery_type,
         items: cartItems,
       };
@@ -199,6 +201,21 @@ export default function Checkout({ cartItems, onBack, onSuccess, onRemoveItem, o
                         ))}
                     </div>
                 </div>
+
+                {formData.delivery_type === 'local' && (
+                    <div className="animate-in slide-in-from-top duration-300">
+                        <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 ml-2">Número de mesa</label>
+                        <input
+                            type="text"
+                            name="table_number"
+                            value={formData.table_number}
+                            onChange={handleChange}
+                            required
+                            className="w-full p-4 bg-gray-50 border-2 border-gray-100 rounded-2xl focus:border-red-600 outline-none transition-all font-bold"
+                            placeholder="Ej: Mesa 5"
+                        />
+                    </div>
+                )}
 
                 {formData.delivery_type === 'domicilio' && (
                     <div className="animate-in slide-in-from-top duration-300 space-y-4">

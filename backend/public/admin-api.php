@@ -272,14 +272,15 @@ function handleCreateCategory($db) {
     $data = json_decode(file_get_contents('php://input'), true);
     $name    = $data['name'];
     $is_req  = (int)$data['is_required'];
+    $is_addon = (int)($data['is_addon'] ?? 0);
     $max_sel = (int)$data['max_selections'];
     $order   = (int)$data['order_index'];
-    $type    = $data['product_type'];
+    $type    = !empty($data['product_type']) ? $data['product_type'] : 'ambos';
     $active  = (int)($data['is_active'] ?? 1);
     $allow_qty = (int)($data['allow_quantity'] ?? 0);
     
-    $stmt = $db->prepare("INSERT INTO categories (name, is_required, max_selections, order_index, product_type, is_active, allow_quantity) VALUES (?, ?, ?, ?, ?, ?, ?)");
-    $stmt->bind_param('siiisii', $name, $is_req, $max_sel, $order, $type, $active, $allow_qty);
+    $stmt = $db->prepare("INSERT INTO categories (name, is_required, is_addon, max_selections, order_index, product_type, is_active, allow_quantity) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+    $stmt->bind_param('siiiisii', $name, $is_req, $is_addon, $max_sel, $order, $type, $active, $allow_qty);
     $stmt->execute();
     $category_id = $stmt->insert_id;
 
@@ -292,17 +293,19 @@ function handleCreateCategory($db) {
 
 function handleUpdateCategory($db, $id) {
     $data    = json_decode(file_get_contents('php://input'), true);
+    
     $name    = $data['name'] ?? '';
     $is_req  = (int)($data['is_required'] ?? 0);
+    $is_addon = (int)($data['is_addon'] ?? 0);
     $max_sel = (int)($data['max_selections'] ?? 1);
     $order   = (int)($data['order_index'] ?? 0);
-    $type    = $data['product_type'] ?? 'burrito';
+    $type    = !empty($data['product_type']) ? $data['product_type'] : 'ambos';
     $active  = (int)($data['is_active'] ?? 1);
     $allow_qty = (int)($data['allow_quantity'] ?? 0);
     $id_int  = (int)$id;
 
-    $stmt = $db->prepare("UPDATE categories SET name=?, is_required=?, max_selections=?, order_index=?, product_type=?, is_active=?, allow_quantity=? WHERE id=?");
-    $stmt->bind_param('siiisiii', $name, $is_req, $max_sel, $order, $type, $active, $allow_qty, $id_int);
+    $stmt = $db->prepare("UPDATE categories SET name=?, is_required=?, is_addon=?, max_selections=?, order_index=?, product_type=?, is_active=?, allow_quantity=? WHERE id=?");
+    $stmt->bind_param('siiiisiii', $name, $is_req, $is_addon, $max_sel, $order, $type, $active, $allow_qty, $id_int);
     $stmt->execute();
 
     // Sincronizar variaciones
@@ -522,10 +525,11 @@ function handleCreateOrder($db) {
     $customer_name = $data['customer_name'] ?? 'Cliente Sin Nombre';
     $customer_phone = $data['customer_phone'] ?? '';
     $customer_address = $data['customer_address'] ?? '';
+    $table_number = $data['table_number'] ?? null;
     $delivery_type = $data['delivery_type'] ?? 'local';
 
-    $stmt = $db->prepare("INSERT INTO orders (customer_name, customer_phone, customer_address, delivery_type, subtotal, delivery_cost, total, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, 'pendiente', NOW(), NOW())");
-    $stmt->bind_param('ssssddd', $customer_name, $customer_phone, $customer_address, $delivery_type, $subtotal, $delivery_cost, $total);
+    $stmt = $db->prepare("INSERT INTO orders (customer_name, customer_phone, customer_address, table_number, delivery_type, subtotal, delivery_cost, total, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pendiente', NOW(), NOW())");
+    $stmt->bind_param('sssssdds', $customer_name, $customer_phone, $customer_address, $table_number, $delivery_type, $subtotal, $delivery_cost, $total);
     $stmt->execute();
     $order_id = $stmt->insert_id;
 
@@ -692,8 +696,21 @@ function handlePrintOrder($db, $id) {
                 <div style='display:flex;justify-content:space-between;align-items:flex-start;'>
                     <div style='line-height:1.5;'>
                         <p><span style='font-weight:900;text-transform:uppercase;background:#000;color:#fff;padding:0 4px;margin-right:4px;'>Cliente</span>{$order['customer_name']}</p>
-                        <p><span style='font-weight:900;text-transform:uppercase;'>Tel:</span> {$order['customer_phone']}</p>
-                        <p><span style='font-weight:900;text-transform:uppercase;'>Dir:</span> " . ($order['customer_address'] ?: 'RECOGE EN LOCAL') . "</p>
+                        <p><span style='font-weight:900;text-transform:uppercase;'>Tel:</span> {$order['customer_phone']}</p>";
+    
+    // Mostrar dirección o número de mesa según el tipo de entrega
+    if ($order['delivery_type'] === 'local' && !empty($order['table_number'])) {
+        echo "
+                        <p><span style='font-weight:900;text-transform:uppercase;'>Mesa:</span> {$order['table_number']}</p>";
+    } elseif ($order['delivery_type'] === 'domicilio' && !empty($order['customer_address'])) {
+        echo "
+                        <p><span style='font-weight:900;text-transform:uppercase;'>Dir:</span> {$order['customer_address']}</p>";
+    } else {
+        echo "
+                        <p><span style='font-weight:900;text-transform:uppercase;'>Dir:</span> RECOGE EN LOCAL</p>";
+    }
+    
+    echo "
                         <p><span style='font-weight:900;text-transform:uppercase;'>Entrega:</span> " . strtoupper($order['delivery_type']) . "</p>
                     </div>
                     <div style='text-align:right;'>

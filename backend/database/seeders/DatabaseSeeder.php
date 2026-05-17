@@ -37,6 +37,22 @@ class DatabaseSeeder extends Seeder
             'updated_at'  => $now,
         ]);
 
+        DB::table('settings')->insertOrIgnore([
+            'key'         => 'mensaje_pedido_aceptado',
+            'value'       => '¡Gracias por elegir Deli Burrito!',
+            'description' => 'Mensaje adicional de WhatsApp cuando se acepta un pedido',
+            'created_at'  => $now,
+            'updated_at'  => $now,
+        ]);
+
+        DB::table('settings')->insertOrIgnore([
+            'key'         => 'mensaje_pedido_cancelado',
+            'value'       => 'Disculpa las molestias.',
+            'description' => 'Mensaje adicional de WhatsApp cuando se cancela un pedido',
+            'created_at'  => $now,
+            'updated_at'  => $now,
+        ]);
+
         // ── Categorías y opciones del menú ─────────────────────────────────
 
         // 1. Proteína Principal (obligatoria, 1 selección)

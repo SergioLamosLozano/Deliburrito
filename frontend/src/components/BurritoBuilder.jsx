@@ -17,6 +17,17 @@ export default function BurritoBuilder({ onCheckout, initialCart = [], showToast
     [productTypes, productType]
   );
 
+  // ── Scroll automático al cambiar de paso ────────────────────────────────
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    
+    // Scroll horizontal en la barra de progreso para mostrar el paso actual
+    const currentStepButton = document.getElementById(`step-button-${step}`);
+    if (currentStepButton) {
+      currentStepButton.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+    }
+  }, [step]);
+
   // ── Carga inicial ────────────────────────────────────────────────────────
   useEffect(() => {
     Promise.all([
@@ -205,9 +216,20 @@ export default function BurritoBuilder({ onCheckout, initialCart = [], showToast
 
   // Atrás desde el constructor: paso anterior → variación → inicio
   const handleBack = () => {
-    if (step > 1) { setStep(step - 1); return; }
+    if (step > 1) { 
+      setStep(step - 1); 
+      return; 
+    }
     if (typeHasVariations && selectedVariation) { setSelectedVariation(null); return; }
     resetBuilder();
+  };
+
+  const handleNext = () => {
+    if (step < filteredCategories.length) {
+      setStep(step + 1);
+    } else {
+      addToCart();
+    }
   };
 
   if (loading) return (
@@ -370,7 +392,12 @@ export default function BurritoBuilder({ onCheckout, initialCart = [], showToast
               {filteredCategories.map((cat, idx) => (
                 <button
                   key={cat.id}
-                  onClick={() => (idx < step || isStepValid()) ? setStep(idx + 1) : null}
+                  id={`step-button-${idx + 1}`}
+                  onClick={() => {
+                    if (idx < step || isStepValid()) {
+                      setStep(idx + 1);
+                    }
+                  }}
                   className={`w-12 h-12 sm:w-16 sm:h-16 rounded-full font-black text-lg sm:text-2xl flex items-center justify-center transition-all shrink-0 ${
                     step === idx + 1
                       ? 'bg-red-600 text-white shadow-2xl scale-110'
@@ -416,25 +443,6 @@ export default function BurritoBuilder({ onCheckout, initialCart = [], showToast
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
-                  {currentCategory.name.toLowerCase().includes('salsa') && (
-                    <button
-                      onClick={() => setSelection(prev => ({ ...prev, [currentCategory.id]: [] }))}
-                      className={`relative p-3 sm:p-4 rounded-3xl border-4 text-left transition-all group ${
-                        (selection[currentCategory.id] || []).length === 0
-                          ? 'border-gray-800 bg-gray-100'
-                          : 'border-gray-100 bg-gray-50 hover:border-gray-200'
-                      }`}
-                    >
-                      <div className="flex flex-col h-full justify-between">
-                        <span className="text-base font-bold leading-tight mb-2 uppercase text-gray-900">Sin Salsas</span>
-                        <span className="font-black text-sm text-gray-400">NINGUNA</span>
-                      </div>
-                      {(selection[currentCategory.id] || []).length === 0 && (
-                        <div className="absolute -top-2 -right-2 w-7 h-7 rounded-full flex items-center justify-center text-white text-xs shadow-lg bg-gray-800">✓</div>
-                      )}
-                    </button>
-                  )}
-
                   {(currentCategory.options ?? []).map(option => {
                     const allowQty = currentCategory.allow_quantity == 1;
                     const isSingle = currentCategory.max_selections === 1 && !allowQty;
@@ -453,13 +461,13 @@ export default function BurritoBuilder({ onCheckout, initialCart = [], showToast
                       <div key={option.id} className="relative group">
                         <button
                           onClick={() => toggleSelection(currentCategory.id, option)}
-                          className={`w-full p-3 sm:p-4 rounded-3xl border-4 text-left transition-all min-h-[90px] flex items-center ${
+                          className={`w-full p-3 sm:p-4 rounded-3xl border-4 text-left transition-all min-h-[90px] flex flex-col justify-between ${
                             isSelected
                               ? isSingle ? 'border-red-600 bg-red-50' : 'border-green-600 bg-green-50'
                               : 'border-gray-100 bg-gray-50 hover:border-gray-200'
                           }`}
                         >
-                          <div className="flex flex-col h-full justify-center pr-10">
+                          <div className="flex flex-col">
                             <span className={`text-base font-bold leading-tight mb-1 ${isSelected ? 'text-gray-900' : 'text-gray-700'}`}>
                               {option.name}
                             </span>
@@ -469,21 +477,22 @@ export default function BurritoBuilder({ onCheckout, initialCart = [], showToast
                                 : 'GRATIS'}
                             </span>
                           </div>
+                          
+                          {/* Selector de cantidad horizontal debajo del precio */}
+                          {allowQty && isSelected && (
+                            <div className="flex items-center gap-2 mt-2" onClick={(e) => e.stopPropagation()}>
+                              <button 
+                                onClick={(e) => { e.stopPropagation(); updateQuantity(currentCategory.id, option, -1); }}
+                                className="w-8 h-8 rounded-lg bg-white hover:bg-red-100 text-red-600 flex items-center justify-center font-black transition-colors text-base border-2 border-red-200 shadow-sm"
+                              >−</button>
+                              <span className="flex-1 text-center font-black text-base text-gray-800 bg-white rounded-lg py-1 px-2 border-2 border-gray-200 min-w-[40px]">{quantity}</span>
+                              <button 
+                                onClick={(e) => { e.stopPropagation(); updateQuantity(currentCategory.id, option, 1); }}
+                                className="w-8 h-8 rounded-lg bg-white hover:bg-green-100 text-green-600 flex items-center justify-center font-black transition-colors text-base border-2 border-green-200 shadow-sm"
+                              >+</button>
+                            </div>
+                          )}
                         </button>
-                        
-                        {allowQty && isSelected && (
-                          <div className="absolute top-1/2 -translate-y-1/2 right-1.5 flex flex-col items-center gap-0.5 bg-white rounded-xl shadow-lg border border-gray-100 p-0.5 z-10">
-                             <button 
-                               onClick={(e) => { e.stopPropagation(); updateQuantity(currentCategory.id, option, 1); }}
-                               className="w-6 h-6 rounded-lg bg-gray-50 hover:bg-green-100 text-green-600 flex items-center justify-center font-black transition-colors text-[10px]"
-                             >+</button>
-                             <span className="h-4 flex items-center justify-center font-black text-[9px] text-gray-800">{quantity}</span>
-                             <button 
-                               onClick={(e) => { e.stopPropagation(); updateQuantity(currentCategory.id, option, -1); }}
-                               className="w-6 h-6 rounded-lg bg-gray-50 hover:bg-red-100 text-red-600 flex items-center justify-center font-black transition-colors text-[10px]"
-                             >-</button>
-                          </div>
-                        )}
                         
                         {isSelected && !allowQty && (
                           <div className={`absolute -top-2 -right-2 w-7 h-7 rounded-full flex items-center justify-center text-white text-xs shadow-lg ${isSingle ? 'bg-red-600' : 'bg-green-600'}`}>✓</div>
@@ -501,7 +510,7 @@ export default function BurritoBuilder({ onCheckout, initialCart = [], showToast
                   ATRÁS
                 </button>
                 <button
-                  onClick={() => { if (step < filteredCategories.length) setStep(step + 1); else addToCart(); }}
+                  onClick={handleNext}
                   disabled={!isStepValid()}
                   className={`flex-[2] p-4 rounded-3xl font-black shadow-xl transition-all active:scale-95 ${
                     isStepValid() ? 'bg-red-600 text-white' : 'bg-gray-300 text-gray-500'
@@ -555,10 +564,27 @@ export default function BurritoBuilder({ onCheckout, initialCart = [], showToast
                   </div>
                 </div>
 
-                <button onClick={addToCart}
-                  className="w-full py-4 bg-yellow-400 text-red-900 rounded-3xl font-black text-lg shadow-xl hover:bg-yellow-300 active:scale-95 transition-all">
-                  AGREGAR A LA ORDEN
+                <button 
+                  onClick={addToCart}
+                  disabled={step < filteredCategories.length || !isStepValid()}
+                  className={`w-full py-4 rounded-3xl font-black text-lg shadow-xl transition-all ${
+                    step === filteredCategories.length && isStepValid()
+                      ? 'bg-yellow-400 text-red-900 hover:bg-yellow-300 active:scale-95 cursor-pointer'
+                      : 'bg-gray-300 text-gray-500 cursor-not-allowed opacity-60'
+                  }`}
+                >
+                  {step < filteredCategories.length 
+                    ? `COMPLETA PASO ${step}/${filteredCategories.length}` 
+                    : !isStepValid()
+                    ? 'SELECCIONA UNA OPCIÓN'
+                    : 'AGREGAR A LA ORDEN'}
                 </button>
+                
+                {step < filteredCategories.length && (
+                  <p className="text-center text-xs text-gray-400 font-bold mt-2">
+                    Completa todas las categorías para agregar
+                  </p>
+                )}
               </div>
             </div>
           </div>
