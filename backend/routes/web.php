@@ -4,6 +4,7 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Admin\AuthController;
 use App\Http\Controllers\Admin\CategoryController;
 use App\Http\Controllers\Admin\OptionController;
+use App\Http\Controllers\Admin\LoyaltyController;
 use App\Http\Controllers\Admin\OrderController;
 use App\Http\Controllers\Admin\ProductVariationController;
 use App\Http\Controllers\Admin\ReportController;
@@ -34,6 +35,14 @@ Route::post('/orders', [App\Http\Controllers\OrderController::class, 'store'])
 // ── URL del panel admin leída desde config/admin.php → .env ADMIN_PATH ───
 // Usar config() en lugar de env() garantiza que funcione con y sin caché de config
 $adminPath = config('admin.path', 'admin');
+
+Route::get($adminPath, function () use ($adminPath) {
+    if (auth()->check() && auth()->user()->role === 'admin') {
+        return redirect()->route('admin.orders.index');
+    }
+
+    return redirect()->route('admin.login');
+});
 
 // Rutas de autenticación (fuera del grupo protegido)
 Route::get("{$adminPath}/acceso",  [AuthController::class, 'showLogin'])->name('admin.login');
@@ -68,6 +77,11 @@ Route::prefix($adminPath)->name('admin.')->middleware(['auth', 'admin'])->group(
 
     // Reportes
     Route::get('reports', [ReportController::class, 'index'])->name('reports.index');
+
+    // Fidelización
+    Route::get('loyalty', [LoyaltyController::class, 'index'])->name('loyalty.index');
+    Route::put('loyalty/message', [LoyaltyController::class, 'updateMessage'])->name('loyalty.message.update');
+    Route::post('loyalty/notify/{customerPhone}', [LoyaltyController::class, 'notifyReward'])->name('loyalty.notify');
 
     // Configuración
     Route::get('settings', [SettingController::class, 'index'])->name('settings.index');

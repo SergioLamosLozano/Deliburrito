@@ -155,6 +155,12 @@ try {
         requireAdmin();
         if ($method === 'GET') handleListSettings($db);
         elseif ($method === 'POST') handleUpdateSetting($db);
+    } elseif ($path === '/loyalty') {
+        requireAdmin();
+        if ($method === 'GET') handleLoyaltyList($db);
+    } elseif ($path === '/loyalty/notify') {
+        requireAdmin();
+        if ($method === 'POST') handleLoyaltyNotify($db);
     } elseif ($path === '/public-config') {
         // Endpoint público para que el frontend verifique si está abierto
         if ($method === 'GET') handlePublicConfig($db);
@@ -864,8 +870,139 @@ function handlePublicConfig($db) {
 
 function handleUpdateSetting($db) {
     $data = json_decode(file_get_contents('php://input'), true);
-    $stmt = $db->prepare("UPDATE settings SET value = ? WHERE `key` = ?");
-    $stmt->bind_param('ss', $data['value'], $data['key']);
+    $stmt = $db->prepare("INSERT INTO settings (`key`, value, created_at, updated_at) VALUES (?, ?, NOW(), NOW()) ON DUPLICATE KEY UPDATE value = VALUES(value), updated_at = VALUES(updated_at)");
+    $stmt->bind_param('ss', $data['key'], $data['value']);
     $stmt->execute();
     echo json_encode(['ok' => true]);
+}
+
+function handleLoyaltyList($db) {
+    $requiredRes = $db->query("SELECT value FROM settings WHERE `key` = 'loyalty_required_orders' LIMIT 1");
+    $templateRes  = $db->query("SELECT value FROM settings WHERE `key` = 'loyalty_message_template' LIMIT 1");
+
+    $requiredOrders = 15;
+    if ($requiredRes && ($requiredRow = $requiredRes->fetch_assoc())) {
+        $requiredOrders = max(1, (int) $requiredRow['value']);
+    }
+
+    $messageTemplate = '¡Felicidades! Tienes un regalo por tus 15 pedidos.';
+    if ($templateRes && ($templateRow = $templateRes->fetch_assoc())) {
+        $messageTemplate = $templateRow['value'] ?: $messageTemplate;
+    }
+
+    $sql = "SELECT
+                o.customer_phone,
+                (
+                    SELECT latest.customer_name
+                    FROM orders latest
+                    WHERE latest.customer_phone = o.customer_phone
+                      AND latest.status = 'aceptado'
+                      AND latest.customer_phone IS NOT NULL
+                      AND latest.customer_phone <> ''
+                    ORDER BY latest.created_at DESC, latest.id DESC
+                    LIMIT 1
+                ) AS latest_customer_name,
+                COUNT(*) AS total_orders,
+                GREATEST(COUNT(*) - COALESCE(lc.last_redeemed_orders_total, 0), 0) AS current_cycle_orders
+            FROM orders o
+            LEFT JOIN loyalty_customers lc ON lc.customer_phone = o.customer_phone
+            WHERE o.status = 'aceptado'
+              AND o.customer_phone IS NOT NULL
+              AND o.customer_phone <> ''
+            GROUP BY o.customer_phone, lc.last_redeemed_orders_total
+            ORDER BY total_orders DESC, o.customer_phone ASC";
+
+    $result = $db->query($sql);
+    $customers = [];
+
+    while ($row = $result->fetch_assoc()) {
+        $currentCycleOrders = (int) $row['current_cycle_orders'];
+
+        $customers[] = [
+            'customer_name' => trim((string) ($row['latest_customer_name'] ?? '')) !== '' ? $row['latest_customer_name'] : 'Sin nombre',
+            'customer_phone' => (string) $row['customer_phone'],
+            'total_orders' => (int) $row['total_orders'],
+            'current_cycle_orders' => $currentCycleOrders,
+            'required_orders' => $requiredOrders,
+            'rewards_available' => $currentCycleOrders >= $requiredOrders ? 1 : 0,
+            'reward_ready' => $currentCycleOrders >= $requiredOrders,
+        ];
+    }
+
+    echo json_encode([
+        'settings' => [
+            ['key' => 'loyalty_required_orders', 'value' => $requiredOrders],
+            ['key' => 'loyalty_message_template', 'value' => $messageTemplate],
+        ],
+        'customers' => $customers,
+    ]);
+}
+
+function handleLoyaltyNotify($db) {
+    $data = json_decode(file_get_contents('php://input'), true);
+    $customerPhone = preg_replace('/\D+/', '', trim((string) ($data['customer_phone'] ?? '')));
+
+    if ($customerPhone === '') {
+        http_response_code(422);
+        echo json_encode(['ok' => false, 'message' => 'Teléfono requerido']);
+        return;
+    }
+
+    $requiredRes = $db->query("SELECT value FROM settings WHERE `key` = 'loyalty_required_orders' LIMIT 1");
+    $templateRes  = $db->query("SELECT value FROM settings WHERE `key` = 'loyalty_message_template' LIMIT 1");
+
+    $requiredOrders = 15;
+    if ($requiredRes && ($requiredRow = $requiredRes->fetch_assoc())) {
+        $requiredOrders = max(1, (int) $requiredRow['value']);
+    }
+
+    $messageTemplate = '¡Felicidades! Tienes un regalo por tus 15 pedidos.';
+    if ($templateRes && ($templateRow = $templateRes->fetch_assoc())) {
+        $messageTemplate = $templateRow['value'] ?: $messageTemplate;
+    }
+
+    $stmt = $db->prepare("SELECT COUNT(*) AS total_orders FROM orders WHERE status = 'aceptado' AND customer_phone = ?");
+    $stmt->bind_param('s', $customerPhone);
+    $stmt->execute();
+    $totalRow = $stmt->get_result()->fetch_assoc();
+    $totalOrders = (int) ($totalRow['total_orders'] ?? 0);
+
+    $stmt = $db->prepare("SELECT last_redeemed_orders_total FROM loyalty_customers WHERE customer_phone = ? LIMIT 1");
+    $stmt->bind_param('s', $customerPhone);
+    $stmt->execute();
+    $loyaltyRow = $stmt->get_result()->fetch_assoc();
+    $lastRedeemed = (int) ($loyaltyRow['last_redeemed_orders_total'] ?? 0);
+
+    $currentCycleOrders = max(0, $totalOrders - $lastRedeemed);
+
+    if ($currentCycleOrders < $requiredOrders) {
+        http_response_code(422);
+        echo json_encode(['ok' => false, 'message' => 'Todavía no alcanza el umbral requerido']);
+        return;
+    }
+
+    $stmt = $db->prepare("SELECT customer_name FROM orders WHERE status = 'aceptado' AND customer_phone = ? ORDER BY created_at DESC, id DESC LIMIT 1");
+    $stmt->bind_param('s', $customerPhone);
+    $stmt->execute();
+    $latestRow = $stmt->get_result()->fetch_assoc();
+    $latestCustomerName = $latestRow['customer_name'] ?? null;
+
+    $nextRedeemedTotal = $totalOrders;
+
+    $stmt = $db->prepare("INSERT INTO loyalty_customers (customer_phone, last_customer_name, last_redeemed_orders_total, last_redeemed_at, created_at, updated_at) VALUES (?, ?, ?, NOW(), NOW(), NOW()) ON DUPLICATE KEY UPDATE last_customer_name = VALUES(last_customer_name), last_redeemed_orders_total = VALUES(last_redeemed_orders_total), last_redeemed_at = VALUES(last_redeemed_at), updated_at = VALUES(updated_at)");
+    $stmt->bind_param('ssi', $customerPhone, $latestCustomerName, $nextRedeemedTotal);
+    $stmt->execute();
+
+    if (strlen($customerPhone) === 10) {
+        $customerPhone = '57' . $customerPhone;
+    }
+
+    $waLink = 'https://wa.me/' . $customerPhone . '?text=' . rawurlencode($messageTemplate);
+
+    echo json_encode([
+        'ok' => true,
+        'wa_link' => $waLink,
+        'required_orders' => $requiredOrders,
+        'current_cycle_orders' => $isProduction ? 0 : $requiredOrders,
+    ]);
 }

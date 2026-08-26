@@ -53,6 +53,16 @@ class DatabaseSeeder extends Seeder
             'updated_at'  => $now,
         ]);
 
+        DB::table('settings')->insertOrIgnore([
+            'key'         => 'comercio_abierto',
+            'value'       => '0',
+            'description' => 'Si el comercio está abierto (1) o cerrado (0)',
+            'created_at'  => $now,
+            'updated_at'  => $now,
+        ]);
+
+        $this->call(ProductTypeSeeder::class);
+
         // ── Categorías y opciones del menú ─────────────────────────────────
 
         // 1. Proteína Principal (obligatoria, 1 selección)
@@ -177,5 +187,7 @@ class DatabaseSeeder extends Seeder
             ['category_id' => $adicionesId, 'name' => 'Agua',                'price' => 1000, 'is_active' => true, 'created_at' => $now, 'updated_at' => $now],
             ['category_id' => $adicionesId, 'name' => 'Cerveza',             'price' => 5000, 'is_active' => true, 'created_at' => $now, 'updated_at' => $now],
         ]);
+
+        $this->call(LoyaltyTestOrdersSeeder::class);
     }
 }

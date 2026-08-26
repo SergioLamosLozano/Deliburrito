@@ -45,6 +45,12 @@ export default function Layout({ children }) {
             📊 Reportes
           </Link>
           <Link
+            href="/admin/loyalty"
+            className="block px-4 py-3 rounded-lg hover:bg-red-600 transition-all font-semibold"
+          >
+            ⭐ Fidelización
+          </Link>
+          <Link
             href="/admin/settings"
             className="block px-4 py-3 rounded-lg hover:bg-red-600 transition-all font-semibold"
           >

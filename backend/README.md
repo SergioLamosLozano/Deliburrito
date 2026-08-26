@@ -8,7 +8,7 @@ Archivos generados:
 Instrucciones rápidas (en entorno con PHP + Composer + Laravel):
 
 1. `composer install`
-2. Configurar `.env` con la base de datos
+2. Copiar `.env.example` a `.env` y configurar la base de datos
 3. `php artisan migrate --seed`
 
 Nota: Este repo contiene sólo los archivos de ejemplo para Fase 1. Completar instalación de Laravel es responsabilidad del entorno local.

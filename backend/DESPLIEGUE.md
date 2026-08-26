@@ -19,7 +19,7 @@ Edita el archivo `.env` que subiste a `deliburrito_core`. Asegúrate de cambiar 
 | **APP_URL** | `http://localhost:8000` | `https://tu-dominio.com` |
 | **DB_DATABASE** | `deliburrito_db` | *(El nombre que crees en cPanel)* |
 | **DB_USERNAME** | `root` | *(El usuario que crees en cPanel)* |
-| **DB_PASSWORD** | `Santitover149*` | *(Tu contraseña de cPanel)* |
+| **DB_PASSWORD** | *(vacío en el repositorio)* | *(Tu contraseña de cPanel)* |
 
 > [!IMPORTANT]
 > Nunca dejes `APP_DEBUG=true` en producción, ya que esto podría mostrar información sensible de tu base de datos a los clientes si ocurre un error.
@@ -89,7 +89,7 @@ Este documento queda como el historial definitivo de las resoluciones aplicadas 
 ### 2. Confusión con la Estructura de Rutas de la Aplicación (Laravel)
 *   **Problema:** El dominio principal arrojaba logs de *Auto Index is disabled* o *File not found* al intentar cargar el núcleo de Laravel.
 *   **Causa:** El contenido de la carpeta `public` de Laravel se movió directamente a `public_html`, rompiendo los enlaces hacia las carpetas `vendor` y `bootstrap`.
-*   **Solución:** Se modificó el archivo `/public_html/index.php` para corregir los paths absolutos hacia el directorio del núcleo del proyecto (`/deliburrito_core/backend/`).
+*   **Solución:** Se modificó el archivo `/public_html/index.php` para corregir los paths absolutos hacia el directorio del núcleo del proyecto.
 
 ### 3. Incompatibilidad de Versión de PHP
 *   **Error exacto:** `Composer detected issues in your platform: Your Composer dependencies require a PHP version ">= 8.4.0".`
@@ -99,23 +99,23 @@ Este documento queda como el historial definitivo de las resoluciones aplicadas 
 ### 4. Error de Apertura de Flujo en Ruta Relativa (Error 500 en Raíz)
 *   **Error exacto:** `ErrorException file_get_contents(.../public/../../public_html/index.html): Failed to open stream: No such file or directory`
 *   **Causa:** El helper `public_path()` dentro de `routes/web.php` fallaba al calcular los niveles de carpetas relativas (`../../`) para encontrar el `index.html` de React en cPanel.
-*   **Solución:** Se reemplazó por la ruta absoluta directa del sistema de archivos de cPanel:
+*   **Solución:** Se reemplazó por una ruta absoluta configurable del sistema de archivos del hosting:
 
 ```php
-Route::get('/', function () {    
-    return file_get_contents('/home/deliburr/public_html/index.html');
+Route::get('/', function () {
+    return file_get_contents('/ruta/absoluta/a/public_html/index.html');
 });
 ```
 
 ### 5. Error 500 en Login por Desconexión de Base de Datos (Scripts Híbridos)
 *   **Error exacto:** `Failed to load resource: the server responded with a status of 500 (Internal Server Error)` al llamar a `/admin-api.php?route=admin-login`.
-*   **Causa:** El frontend de React utiliza un script PHP independiente (`admin-api.php`) que ejecuta un lector automático de entornos (`$envPaths`). Este lector buscaba el archivo `.env` en `/deliburrito_core/.env`, omitiendo la subcarpeta interna `backend`. Al no encontrarlo, usaba las credenciales locales por defecto (root, sin contraseña), rompiendo la conexión en producción.
+*   **Causa:** El frontend de React utiliza un script PHP independiente (`admin-api.php`) que ejecuta un lector automático de entornos (`$envPaths`). Este lector buscaba el archivo `.env` en una ruta incorrecta del núcleo, omitiendo la subcarpeta interna `backend`. Al no encontrarlo, usaba las credenciales locales por defecto (root, sin contraseña), rompiendo la conexión en producción.
 *   **Solución:** Se corrigió la ruta de búsqueda en el array del script para incluir el subdirectorio correcto:
 
 ```php
 $envPaths = [
     __DIR__ . '/../.env',
-    __DIR__ . '/../deliburrito_core/backend/.env' // RUTA CORREGIDA
+    __DIR__ . '/../<ruta-al-core>/backend/.env'
 ];
 ```
 

@@ -4,10 +4,12 @@ vendor/
 
 # Environment
 .env
+.env.example
 .env.local
 .env.development.local
 .env.test.local
 .env.production.local
+.env.local.example
 
 # Build
 dist/
@@ -17,6 +19,16 @@ storage/framework/cache/data/
 storage/framework/sessions/
 storage/framework/views/
 storage/logs/*.log
+
+# Backend artifacts generated inside the nested app folder
+backend/vendor/
+backend/bootstrap/cache/
+backend/storage/framework/cache/data/
+backend/storage/framework/sessions/
+backend/storage/framework/views/
+backend/storage/logs/
+backend/public/assets/
+backend/public/index.html
 
 # Logs
 npm-debug.log*

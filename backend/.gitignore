@@ -2,6 +2,12 @@
 /node_modules
 .env
 /public/build
+/public/assets
+/public/index.html
+/storage/framework/cache/data
+/storage/framework/sessions
+/storage/framework/views
+/storage/logs
 /storage/*.key
 .idea
 .vscode
