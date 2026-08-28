@@ -1,10 +1,11 @@
 import React from 'react';
+import { IoCheckmarkCircle } from 'react-icons/io5';
 
 export default function OrderSuccess({ orderId, onReset }) {
   return (
     <div className="min-h-screen bg-gradient-to-b from-green-100 to-blue-100 flex items-center justify-center p-4">
       <div className="bg-white rounded-lg shadow-lg p-8 max-w-md text-center">
-        <div className="text-6xl mb-4">✅</div>
+        <div className="text-6xl mb-4"><IoCheckmarkCircle className="w-16 h-16 text-green-500 mx-auto" /></div>
         <h1 className="text-3xl font-bold text-green-600 mb-2">¡Pedido Enviado!</h1>
         <p className="text-gray-600 mb-4">Tu pedido fue recibido correctamente</p>
         

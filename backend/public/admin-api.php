@@ -161,6 +161,9 @@ try {
     } elseif ($path === '/loyalty/notify') {
         requireAdmin();
         if ($method === 'POST') handleLoyaltyNotify($db);
+    } elseif ($path === '/loyalty/badge') {
+        requireAdmin();
+        if ($method === 'GET') handleLoyaltyBadge($db);
     } elseif ($path === '/public-config') {
         // Endpoint público para que el frontend verifique si está abierto
         if ($method === 'GET') handlePublicConfig($db);
@@ -890,6 +893,71 @@ function handleLoyaltyList($db) {
         $messageTemplate = $templateRow['value'] ?: $messageTemplate;
     }
 
+    // Paginación
+    $page = max(1, (int) ($_GET['page'] ?? 1));
+    $perPage = max(1, min(100, (int) ($_GET['per_page'] ?? 20)));
+    $search = trim((string) ($_GET['search'] ?? ''));
+
+    // Query base
+    $baseWhere = "WHERE o.status = 'aceptado'
+              AND o.customer_phone IS NOT NULL
+              AND o.customer_phone <> ''";
+
+    // Si hay búsqueda, filtrar por nombre o teléfono
+    $searchWhere = '';
+    $searchParam = '';
+    if ($search !== '') {
+        $searchParam = '%' . $db->real_escape_string($search) . '%';
+        $searchWhere = " HAVING latest_customer_name LIKE '$searchParam' OR o.customer_phone LIKE '$searchParam'";
+    }
+
+    // Contar total de clientes (para paginación)
+    $countSql = "SELECT COUNT(*) AS total FROM (
+        SELECT o.customer_phone,
+            (
+                SELECT latest.customer_name
+                FROM orders latest
+                WHERE latest.customer_phone = o.customer_phone
+                  AND latest.status = 'aceptado'
+                  AND latest.customer_phone IS NOT NULL
+                  AND latest.customer_phone <> ''
+                ORDER BY latest.created_at DESC, latest.id DESC
+                LIMIT 1
+            ) AS latest_customer_name
+        FROM orders o
+        LEFT JOIN loyalty_customers lc ON lc.customer_phone = o.customer_phone
+        $baseWhere
+        GROUP BY o.customer_phone, lc.last_redeemed_orders_total
+        $searchWhere
+    ) AS sub";
+
+    $countResult = $db->query($countSql);
+    $totalCustomers = 0;
+    if ($countResult && ($countRow = $countResult->fetch_assoc())) {
+        $totalCustomers = (int) $countRow['total'];
+    }
+
+    $totalPages = max(1, (int) ceil($totalCustomers / $perPage));
+    if ($page > $totalPages) $page = $totalPages;
+    $offset = ($page - 1) * $perPage;
+
+    // Contar clientes con reward_ready (para la campanita)
+    $rewardCountSql = "SELECT COUNT(*) AS reward_count FROM (
+        SELECT GREATEST(COUNT(*) - COALESCE(lc.last_redeemed_orders_total, 0), 0) AS current_cycle_orders
+        FROM orders o
+        LEFT JOIN loyalty_customers lc ON lc.customer_phone = o.customer_phone
+        $baseWhere
+        GROUP BY o.customer_phone, lc.last_redeemed_orders_total
+        HAVING current_cycle_orders >= $requiredOrders
+    ) AS sub";
+
+    $rewardCountResult = $db->query($rewardCountSql);
+    $rewardReadyCount = 0;
+    if ($rewardCountResult && ($rcRow = $rewardCountResult->fetch_assoc())) {
+        $rewardReadyCount = (int) $rcRow['reward_count'];
+    }
+
+    // Query principal con LIMIT/OFFSET
     $sql = "SELECT
                 o.customer_phone,
                 (
@@ -906,11 +974,11 @@ function handleLoyaltyList($db) {
                 GREATEST(COUNT(*) - COALESCE(lc.last_redeemed_orders_total, 0), 0) AS current_cycle_orders
             FROM orders o
             LEFT JOIN loyalty_customers lc ON lc.customer_phone = o.customer_phone
-            WHERE o.status = 'aceptado'
-              AND o.customer_phone IS NOT NULL
-              AND o.customer_phone <> ''
+            $baseWhere
             GROUP BY o.customer_phone, lc.last_redeemed_orders_total
-            ORDER BY total_orders DESC, o.customer_phone ASC";
+            $searchWhere
+            ORDER BY current_cycle_orders DESC, total_orders DESC, o.customer_phone ASC
+            LIMIT $perPage OFFSET $offset";
 
     $result = $db->query($sql);
     $customers = [];
@@ -935,12 +1003,47 @@ function handleLoyaltyList($db) {
             ['key' => 'loyalty_message_template', 'value' => $messageTemplate],
         ],
         'customers' => $customers,
+        'pagination' => [
+            'current_page' => $page,
+            'per_page' => $perPage,
+            'total' => $totalCustomers,
+            'total_pages' => $totalPages,
+        ],
+        'reward_ready_count' => $rewardReadyCount,
     ]);
+}
+
+function handleLoyaltyBadge($db) {
+    $requiredRes = $db->query("SELECT value FROM settings WHERE `key` = 'loyalty_required_orders' LIMIT 1");
+    $requiredOrders = 15;
+    if ($requiredRes && ($requiredRow = $requiredRes->fetch_assoc())) {
+        $requiredOrders = max(1, (int) $requiredRow['value']);
+    }
+
+    $sql = "SELECT COUNT(*) AS reward_count FROM (
+        SELECT GREATEST(COUNT(*) - COALESCE(lc.last_redeemed_orders_total, 0), 0) AS current_cycle_orders
+        FROM orders o
+        LEFT JOIN loyalty_customers lc ON lc.customer_phone = o.customer_phone
+        WHERE o.status = 'aceptado'
+          AND o.customer_phone IS NOT NULL
+          AND o.customer_phone <> ''
+        GROUP BY o.customer_phone, lc.last_redeemed_orders_total
+        HAVING current_cycle_orders >= $requiredOrders
+    ) AS sub";
+
+    $result = $db->query($sql);
+    $count = 0;
+    if ($result && ($row = $result->fetch_assoc())) {
+        $count = (int) $row['reward_count'];
+    }
+
+    echo json_encode(['reward_ready_count' => $count]);
 }
 
 function handleLoyaltyNotify($db) {
     $data = json_decode(file_get_contents('php://input'), true);
-    $customerPhone = preg_replace('/\D+/', '', trim((string) ($data['customer_phone'] ?? '')));
+    $rawPhone = trim((string) ($data['customer_phone'] ?? ''));
+    $customerPhone = preg_replace('/\D+/', '', $rawPhone);
 
     if ($customerPhone === '') {
         http_response_code(422);
@@ -961,13 +1064,15 @@ function handleLoyaltyNotify($db) {
         $messageTemplate = $templateRow['value'] ?: $messageTemplate;
     }
 
-    $stmt = $db->prepare("SELECT COUNT(*) AS total_orders FROM orders WHERE status = 'aceptado' AND customer_phone = ?");
+    // Buscar pedidos comparando teléfono normalizado (sin espacios ni caracteres especiales)
+    $stmt = $db->prepare("SELECT COUNT(*) AS total_orders FROM orders WHERE status = 'aceptado' AND REPLACE(REPLACE(customer_phone, ' ', ''), '-', '') = ?");
     $stmt->bind_param('s', $customerPhone);
     $stmt->execute();
     $totalRow = $stmt->get_result()->fetch_assoc();
     $totalOrders = (int) ($totalRow['total_orders'] ?? 0);
 
-    $stmt = $db->prepare("SELECT last_redeemed_orders_total FROM loyalty_customers WHERE customer_phone = ? LIMIT 1");
+    // Buscar en loyalty_customers también con normalización
+    $stmt = $db->prepare("SELECT last_redeemed_orders_total FROM loyalty_customers WHERE REPLACE(REPLACE(customer_phone, ' ', ''), '-', '') = ? LIMIT 1");
     $stmt->bind_param('s', $customerPhone);
     $stmt->execute();
     $loyaltyRow = $stmt->get_result()->fetch_assoc();
@@ -981,18 +1086,22 @@ function handleLoyaltyNotify($db) {
         return;
     }
 
-    $stmt = $db->prepare("SELECT customer_name FROM orders WHERE status = 'aceptado' AND customer_phone = ? ORDER BY created_at DESC, id DESC LIMIT 1");
+    // Obtener el nombre del cliente más reciente
+    $stmt = $db->prepare("SELECT customer_name, customer_phone FROM orders WHERE status = 'aceptado' AND REPLACE(REPLACE(customer_phone, ' ', ''), '-', '') = ? ORDER BY created_at DESC, id DESC LIMIT 1");
     $stmt->bind_param('s', $customerPhone);
     $stmt->execute();
     $latestRow = $stmt->get_result()->fetch_assoc();
     $latestCustomerName = $latestRow['customer_name'] ?? null;
+    // Usar el teléfono tal como está en la BD para loyalty_customers (consistencia)
+    $dbPhone = $latestRow['customer_phone'] ?? $rawPhone;
 
     $nextRedeemedTotal = $totalOrders;
 
     $stmt = $db->prepare("INSERT INTO loyalty_customers (customer_phone, last_customer_name, last_redeemed_orders_total, last_redeemed_at, created_at, updated_at) VALUES (?, ?, ?, NOW(), NOW(), NOW()) ON DUPLICATE KEY UPDATE last_customer_name = VALUES(last_customer_name), last_redeemed_orders_total = VALUES(last_redeemed_orders_total), last_redeemed_at = VALUES(last_redeemed_at), updated_at = VALUES(updated_at)");
-    $stmt->bind_param('ssi', $customerPhone, $latestCustomerName, $nextRedeemedTotal);
+    $stmt->bind_param('ssi', $dbPhone, $latestCustomerName, $nextRedeemedTotal);
     $stmt->execute();
 
+    // Para el link de WhatsApp usar solo dígitos
     if (strlen($customerPhone) === 10) {
         $customerPhone = '57' . $customerPhone;
     }
@@ -1003,6 +1112,6 @@ function handleLoyaltyNotify($db) {
         'ok' => true,
         'wa_link' => $waLink,
         'required_orders' => $requiredOrders,
-        'current_cycle_orders' => $isProduction ? 0 : $requiredOrders,
+        'current_cycle_orders' => 0,
     ]);
 }

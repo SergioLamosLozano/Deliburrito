@@ -9,6 +9,7 @@
   <title>Admin Dashboard - Deli Burrito</title>
   <link rel="icon" type="image/x-icon" href="/deliburrito.ico" />
   <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;900&display=swap" rel="stylesheet">
   <style>
     body { font-family: 'Outfit', sans-serif; }
@@ -51,25 +52,25 @@
 
       <nav class="flex-1 p-4 space-y-2 overflow-y-auto custom-scrollbar">
         <button data-view="orders" class="nav-btn w-full flex items-center gap-3 px-6 py-4 rounded-2xl transition-all hover:bg-white/10 font-bold">
-          <span class="text-xl">📦</span> Pedidos
+          <i data-lucide="package" class="w-5 h-5 text-yellow-300"></i> Pedidos
         </button>
         <button data-view="categories" class="nav-btn w-full flex items-center gap-3 px-6 py-4 rounded-2xl transition-all hover:bg-white/10 font-bold">
-          <span class="text-xl">🗂️</span> Categorías
+          <i data-lucide="layers" class="w-5 h-5 text-orange-300"></i> Categorías
         </button>
         <button data-view="product-types" class="nav-btn w-full flex items-center gap-3 px-6 py-4 rounded-2xl transition-all hover:bg-white/10 font-bold">
-          <span class="text-xl">🍔</span> Módulos de Comida
+          <i data-lucide="utensils" class="w-5 h-5 text-red-300"></i> Módulos de Comida
         </button>
         <button data-view="variations" class="nav-btn w-full flex items-center gap-3 px-6 py-4 rounded-2xl transition-all hover:bg-white/10 font-bold">
-          <span class="text-xl">🎛️</span> Tipo de Producto
+          <i data-lucide="sliders-horizontal" class="w-5 h-5 text-blue-300"></i> Tipo de Producto
         </button>
         <button data-view="options" class="nav-btn w-full flex items-center gap-3 px-6 py-4 rounded-2xl transition-all hover:bg-white/10 font-bold">
-          <span class="text-xl">🍕</span> Opciones / Precios
+          <i data-lucide="tag" class="w-5 h-5 text-emerald-300"></i> Opciones / Precios
         </button>
                 <button data-view="loyalty" class="nav-btn w-full flex items-center gap-3 px-6 py-4 rounded-2xl transition-all hover:bg-white/10 font-bold">
-                    <span class="text-xl">⭐</span> Fidelización
+                    <i data-lucide="star" class="w-5 h-5 text-yellow-300"></i> Fidelización
                 </button>
         <button data-view="settings" class="nav-btn w-full flex items-center gap-3 px-6 py-4 rounded-2xl transition-all hover:bg-white/10 font-bold">
-          <span class="text-xl">⚙️</span> Ajustes
+          <i data-lucide="settings" class="w-5 h-5 text-gray-300"></i> Ajustes
         </button>
       </nav>
 
@@ -99,7 +100,27 @@
                 </label>
             </div>
             <span id="updateTimer" class="text-xs text-gray-400 font-mono bg-gray-100 px-3 py-1 rounded-full">Actualizado hace: 0s</span>
-            <button id="refreshBtn" class="bg-red-50 text-red-600 p-2 rounded-xl hover:bg-red-100 transition-colors">🔄</button>
+            <!-- Notification Bell -->
+            <div class="relative" id="bellContainer">
+                <button id="bellBtn" onclick="toggleBellDropdown()" class="relative bg-yellow-50 text-yellow-700 p-2 rounded-xl hover:bg-yellow-100 transition-colors" title="Notificaciones de Fidelización">
+                    <i data-lucide="bell" class="w-5 h-5"></i>
+                    <span id="bellBadge" class="absolute -top-1 -right-1 bg-red-500 text-white text-[9px] font-black rounded-full min-w-[18px] h-[18px] flex items-center justify-center leading-none hidden">0</span>
+                </button>
+                <!-- Bell Dropdown -->
+                <div id="bellDropdown" class="hidden absolute right-0 top-12 w-80 bg-white rounded-2xl shadow-2xl border border-gray-200 z-50 overflow-hidden">
+                    <div class="px-4 py-3 bg-gray-50 border-b flex items-center justify-between">
+                        <span class="text-xs font-black uppercase text-gray-500 tracking-wider">Premios disponibles</span>
+                        <button onclick="closeBellDropdown()" class="text-gray-400 hover:text-gray-600 text-lg leading-none">&times;</button>
+                    </div>
+                    <div id="bellDropdownList" class="max-h-64 overflow-y-auto custom-scrollbar">
+                        <div class="px-4 py-6 text-center text-gray-400 text-sm">Sin notificaciones</div>
+                    </div>
+                    <div class="px-4 py-3 bg-gray-50 border-t">
+                        <button onclick="switchView('loyalty'); closeBellDropdown();" class="w-full text-center text-xs font-black text-yellow-700 hover:text-yellow-900 uppercase tracking-wider">Ver todos en Fidelización →</button>
+                    </div>
+                </div>
+            </div>
+            <button id="refreshBtn" class="bg-red-50 text-red-600 p-2 rounded-xl hover:bg-red-100 transition-colors"><i data-lucide="refresh-cw" class="w-4 h-4"></i></button>
         </div>
       </header>
 
@@ -228,7 +249,7 @@
                             </div>
                         </div>
 
-                        <div class="xl:col-span-3 bg-white rounded-3xl shadow-sm border overflow-hidden">
+                        <div class="xl:col-span-3 bg-white rounded-3xl shadow-sm border overflow-hidden flex flex-col">
                             <div class="px-6 py-4 border-b bg-gray-50 flex items-center justify-between">
                                 <div>
                                     <h4 class="text-lg font-black uppercase">Top Clientes</h4>
@@ -236,9 +257,14 @@
                                 </div>
                                 <span class="text-xs font-black text-gray-400 uppercase">Pedidos aceptados</span>
                             </div>
-                            <div class="overflow-x-auto">
+                            <!-- Search bar -->
+                            <div class="px-6 py-3 border-b bg-white">
+                                <input type="text" id="loyaltySearchInput" placeholder="Buscar por nombre o teléfono..." class="w-full p-3 bg-gray-50 rounded-xl border-2 border-transparent focus:border-yellow-500 outline-none transition-all font-bold text-sm" />
+                            </div>
+                            <!-- Table with max-height scroll -->
+                            <div class="overflow-y-auto flex-1" style="max-height: 480px;">
                                 <table class="w-full text-left border-collapse">
-                                    <thead class="bg-gray-50 text-xs font-black uppercase text-gray-400 tracking-widest">
+                                    <thead class="bg-gray-50 text-xs font-black uppercase text-gray-400 tracking-widest sticky top-0 z-10">
                                         <tr>
                                             <th class="px-6 py-4">Nombre</th>
                                             <th class="px-6 py-4">Teléfono</th>
@@ -248,6 +274,15 @@
                                     </thead>
                                     <tbody id="loyaltyTableBody" class="divide-y divide-gray-100"></tbody>
                                 </table>
+                            </div>
+                            <!-- Pagination controls -->
+                            <div id="loyaltyPagination" class="px-6 py-4 border-t bg-gray-50 flex items-center justify-between">
+                                <span id="loyaltyPaginationInfo" class="text-xs font-bold text-gray-500"></span>
+                                <div class="flex items-center gap-2">
+                                    <button id="loyaltyPrevBtn" onclick="changeLoyaltyPage(-1)" class="px-3 py-2 rounded-xl bg-gray-200 text-gray-600 font-black text-xs hover:bg-gray-300 transition-all disabled:opacity-40 disabled:cursor-not-allowed">← Anterior</button>
+                                    <span id="loyaltyPageIndicator" class="text-xs font-black text-gray-600 px-2"></span>
+                                    <button id="loyaltyNextBtn" onclick="changeLoyaltyPage(1)" class="px-3 py-2 rounded-xl bg-gray-200 text-gray-600 font-black text-xs hover:bg-gray-300 transition-all disabled:opacity-40 disabled:cursor-not-allowed">Siguiente →</button>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -309,7 +344,7 @@
   <!-- Custom Confirm Modal -->
   <div id="confirmOverlay" class="fixed inset-0 bg-black/80 backdrop-blur-md z-[110] hidden flex items-center justify-center p-4">
     <div class="bg-white w-full max-w-sm rounded-[2.5rem] shadow-2xl p-8 text-center border-4 border-yellow-400 animate-in zoom-in duration-300">
-        <div class="text-6xl mb-4">⚠️</div>
+        <div class="text-6xl mb-4"><i data-lucide="alert-triangle" class="w-16 h-16 text-yellow-500 mx-auto"></i></div>
         <h3 id="confirmTitle" class="text-2xl font-black uppercase tracking-tighter mb-2 text-gray-800">¿Estás seguro?</h3>
         <p id="confirmMessage" class="text-gray-500 font-bold mb-8 leading-tight uppercase text-[10px] tracking-widest">Esta acción no se puede deshacer fácilmente.</p>
         <div class="flex gap-4">
@@ -355,14 +390,14 @@
             <div class="bg-white p-6 rounded-[2.5rem] shadow-sm border border-gray-100 flex flex-col items-center text-center group hover:shadow-xl transition-all">
                 ${type.image_path 
                     ? `<img src="${type.image_path}" class="w-20 h-20 object-cover rounded-2xl mb-4 transform group-hover:scale-110 transition-transform shadow-lg">` 
-                    : `<span class="text-6xl mb-4 transform group-hover:scale-110 transition-transform">${type.emoji || '🍔'}</span>`
+                    : `<span class="text-6xl mb-4 transform group-hover:scale-110 transition-transform">${type.emoji || '<i data-lucide="utensils" class="w-12 h-12"></i>'}</span>`
                 }
                 <h4 class="text-xl font-black uppercase">${type.name}</h4>
                 <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">${type.slug}</p>
                 <p class="text-gray-500 text-sm mt-3 line-clamp-2">${type.description || ''}</p>
                 <div class="mt-6 flex gap-2 w-full">
                     <button onclick='openProductTypeModal(${JSON.stringify(type).replace(/'/g, "&apos;")})' class="flex-1 py-3 bg-gray-100 text-gray-700 rounded-2xl font-bold text-xs hover:bg-gray-200 transition-all uppercase">Editar</button>
-                    <button onclick="deleteProductType(${type.id})" class="p-3 bg-red-50 text-red-600 rounded-2xl hover:bg-red-100 transition-all">🗑️</button>
+                    <button onclick="deleteProductType(${type.id})" class="p-3 bg-red-50 text-red-600 rounded-2xl hover:bg-red-100 transition-all"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
                 </div>
             </div>
         `).join('');
@@ -398,7 +433,7 @@
                         <div class="relative group h-16">
                             <input type="file" id="typeImageInput" accept="image/*" class="hidden" onchange="document.getElementById('imageStatus').textContent = this.files[0].name">
                             <button type="button" onclick="document.getElementById('typeImageInput').click()" class="w-full h-full p-4 bg-gray-50 rounded-2xl border-2 border-dashed border-gray-200 hover:border-red-400 transition-all font-black text-[10px] uppercase text-gray-400 flex flex-col items-center justify-center gap-0.5">
-                                📁 <span id="imageStatus">${type?.image_path ? 'Cambiar Imagen' : 'Subir Imagen'}</span>
+                                <i data-lucide="upload" class="w-5 h-5 mb-1"></i> <span id="imageStatus">${type?.image_path ? 'Cambiar Imagen' : 'Subir Imagen'}</span>
                             </button>
                             <input type="hidden" name="image_path" id="imagePathHidden" value="${type ? (type.image_path || '') : ''}">
                         </div>
@@ -504,7 +539,7 @@
             const label = days === 1
                 ? (hours > 0 ? `Hace 1 día y ${hours}h` : 'Hace 1 día')
                 : `Hace ${days} días`;
-            return { bg: 'bg-blue-100', text: 'text-blue-700', dot: 'bg-blue-400', label: `📦 ${label}` };
+            return { bg: 'bg-blue-100', text: 'text-blue-700', dot: 'bg-blue-400', label: `${label}` };
         }
         
         if (minutes >= 60) { // 1h - 24h
@@ -514,7 +549,7 @@
                 bg:    'bg-red-100',
                 text:  'text-red-700',
                 dot:   'bg-red-500',
-                label: `⚠️ Hace ${h}h ${m}m`,
+                label: `Hace ${h}h ${m}m`,
             };
         }
 
@@ -536,7 +571,7 @@
             bg:    'bg-red-100',
             text:  'text-red-700',
             dot:   'bg-red-500',
-            label: `⚠️ ${minutes} min — URGENTE`,
+            label: `${minutes} min — URGENTE`,
         };
     }
 
@@ -565,13 +600,14 @@
         const toast = document.createElement('div');
         toast.className = `pointer-events-auto min-w-[300px] flex items-center gap-4 p-4 rounded-2xl shadow-2xl border bg-white animate-in slide-in-from-right duration-500 transition-all ${type === 'success' ? 'border-green-100 text-green-800' : 'border-red-100 text-red-800'}`;
         toast.innerHTML = `
-            <span class="text-2xl">${type === 'success' ? '✅' : '❌'}</span>
+            <span class="text-2xl">${type === 'success' ? '<i data-lucide="check-circle" class="w-6 h-6 text-green-500"></i>' : '<i data-lucide="x-circle" class="w-6 h-6 text-red-500"></i>'}</span>
             <div>
                 <p class="font-black uppercase text-[10px] tracking-widest opacity-50">${type === 'success' ? 'Éxito' : 'Atención'}</p>
                 <p class="font-bold text-sm leading-tight">${message}</p>
             </div>
         `;
         container.appendChild(toast);
+        lucide.createIcons({ nodes: [toast] });
         setTimeout(() => {
             toast.classList.add('opacity-0', 'translate-x-full');
             setTimeout(() => toast.remove(), 500);
@@ -683,6 +719,12 @@
     }
 
     async function loadViewData() {
+        // Loyalty tiene su propia lógica de carga con paginación
+        if (currentView === 'loyalty') {
+            loadLoyaltyData();
+            return;
+        }
+
         let url = `${apiBase}/admin-api.php?route=${currentView === 'orders' ? 'orders' : currentView}`;
         
         // Solo para pedidos, y si ya tenemos un caché, pasamos el parámetro since
@@ -728,9 +770,6 @@
         } else if (currentView === 'options') {
             dataCache.options = data;
             renderOptions();
-        } else if (currentView === 'loyalty') {
-            dataCache.loyalty = data;
-            renderLoyalty(data);
         } else if (currentView === 'settings') {
             const delivery = data.find(s => s.key === 'costo_domicilio');
             const msgAceptado = data.find(s => s.key === 'mensaje_pedido_aceptado');
@@ -747,6 +786,8 @@
             }
         }
         lastUpdate = new Date();
+        // Re-initialize Lucide icons for any dynamic content
+        lucide.createIcons();
     }
 
     // --- RENDERERS ---
@@ -836,13 +877,13 @@
                     <div class="flex flex-col items-end gap-2">
                         <div class="flex gap-2">
                             ${order.status === 'pendiente' ? `
-                                <button onclick="event.stopPropagation(); acceptOrderFlow(${order.id})" class="p-3 bg-green-500 text-white rounded-xl hover:bg-green-600 transition-colors shadow-lg" title="Aceptar">✓</button>
-                                <button onclick="event.stopPropagation(); updateOrderStatus(${order.id}, 'cancelado')" class="p-3 bg-red-100 text-red-600 rounded-xl hover:bg-red-200 transition-colors" title="Cancelar">✕</button>
+                                <button onclick="event.stopPropagation(); acceptOrderFlow(${order.id})" class="p-3 bg-green-500 text-white rounded-xl hover:bg-green-600 transition-colors shadow-lg" title="Aceptar"><i data-lucide="check" class="w-4 h-4"></i></button>
+                                <button onclick="event.stopPropagation(); updateOrderStatus(${order.id}, 'cancelado')" class="p-3 bg-red-100 text-red-600 rounded-xl hover:bg-red-200 transition-colors" title="Cancelar"><i data-lucide="x" class="w-4 h-4"></i></button>
                             ` : ''}
                             ${order.status === 'aceptado' && order.customer_phone ? `
-                                <button onclick="event.stopPropagation(); sendWhatsApp(dataCache.orders.find(o=>o.id==${order.id}))" class="p-3 bg-green-100 text-green-700 rounded-xl hover:bg-green-200 transition-colors" title="Reenviar WhatsApp">💬</button>
+                                <button onclick="event.stopPropagation(); sendWhatsApp(dataCache.orders.find(o=>o.id==${order.id}))" class="p-3 bg-[#25D366]/10 text-[#25D366] rounded-xl hover:bg-[#25D366]/20 transition-colors" title="Reenviar WhatsApp"><svg class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg></button>
                             ` : ''}
-                            <button onclick="event.stopPropagation(); window.open('${apiBase}/admin-api.php?route=orders/${order.id}/print')" class="p-3 bg-slate-800 text-white rounded-xl hover:bg-slate-900 transition-colors shadow-lg" title="Imprimir">🖨️</button>
+                            <button onclick="event.stopPropagation(); window.open('${apiBase}/admin-api.php?route=orders/${order.id}/print')" class="p-3 bg-slate-800 text-white rounded-xl hover:bg-slate-900 transition-colors shadow-lg" title="Imprimir"><i data-lucide="printer" class="w-4 h-4"></i></button>
                         </div>
                         ${tl ? `
                             <span
@@ -859,10 +900,13 @@
         `;
         }).join('') || `
             <div class="col-span-full py-20 text-center">
-                <div class="text-4xl mb-4">💨</div>
+                <div class="mb-4"><i data-lucide="wind" class="w-10 h-10 text-gray-300 mx-auto"></i></div>
                 <p class="text-gray-400 font-black uppercase text-xs tracking-widest">No hay pedidos en esta sección</p>
             </div>
         `;
+
+        // Re-initialize Lucide icons for dynamically rendered content
+        lucide.createIcons();
     }
 
     function renderCategories() {
@@ -905,7 +949,7 @@
         if (!variations || variations.length === 0) {
             container.innerHTML = `
                 <div class="bg-white rounded-3xl shadow-sm border p-16 text-center">
-                    <p class="text-5xl mb-4">🎛️</p>
+                    <p class="text-5xl mb-4"><i data-lucide="sliders-horizontal" class="w-12 h-12 text-gray-300 mx-auto"></i></p>
                     <p class="text-gray-500 font-black uppercase text-xs tracking-widest">No hay tipos de producto configurados aún</p>
                     <p class="text-gray-400 text-sm mt-2">Crea los tipos de tus productos para habilitar categorías condicionales.</p>
                     <button onclick="openVariationModal()" class="mt-6 bg-red-600 text-white px-8 py-3 rounded-2xl font-black hover:bg-red-700 transition-all">Crear primer tipo</button>
@@ -1106,14 +1150,107 @@
         `).join('') || '<div class="py-20 text-center text-gray-400 font-bold">No hay ingredientes configurados.</div>';
     }
 
+        // ── NOTIFICATION BELL ──
+        let bellRewardCustomers = [];
+        let bellPreviousCount = 0;
+        let bellLastSeenCount = parseInt(localStorage.getItem('deliburrito_bell_seen') || '0', 10);
+
+        function updateLoyaltyBell(count) {
+            const badge = document.getElementById('bellBadge');
+            const unread = count - bellLastSeenCount;
+
+            if (unread > 0) {
+                badge.textContent = unread > 99 ? '99+' : unread;
+                badge.classList.remove('hidden');
+                // Animate bell if genuinely new notifications appeared
+                if (count > bellPreviousCount && bellPreviousCount >= 0) {
+                    const bellBtn = document.getElementById('bellBtn');
+                    bellBtn.classList.add('animate-bounce');
+                    setTimeout(() => bellBtn.classList.remove('animate-bounce'), 1000);
+                }
+            } else {
+                badge.classList.add('hidden');
+            }
+            bellPreviousCount = count;
+        }
+
+        function markBellAsRead() {
+            // Mark current count as seen
+            bellLastSeenCount = bellPreviousCount;
+            localStorage.setItem('deliburrito_bell_seen', String(bellPreviousCount));
+            document.getElementById('bellBadge').classList.add('hidden');
+        }
+
+        function toggleBellDropdown() {
+            const dropdown = document.getElementById('bellDropdown');
+            if (dropdown.classList.contains('hidden')) {
+                // Fetch reward-ready customers for the dropdown
+                fetch(`${apiBase}/admin-api.php?route=loyalty&page=1&per_page=10`)
+                    .then(r => r.json())
+                    .then(data => {
+                        const rewardCustomers = (data.customers || []).filter(c => c.reward_ready);
+                        renderBellDropdown(rewardCustomers);
+                        dropdown.classList.remove('hidden');
+                        // Mark as read when dropdown is opened
+                        markBellAsRead();
+                    })
+                    .catch(() => {
+                        dropdown.classList.remove('hidden');
+                    });
+            } else {
+                dropdown.classList.add('hidden');
+            }
+        }
+
+        function closeBellDropdown() {
+            document.getElementById('bellDropdown').classList.add('hidden');
+        }
+
+        function renderBellDropdown(customers) {
+            const list = document.getElementById('bellDropdownList');
+            if (customers.length === 0) {
+                list.innerHTML = '<div class="px-4 py-6 text-center text-gray-400 text-sm">No hay premios pendientes</div>';
+                return;
+            }
+            list.innerHTML = customers.map(c => `
+                <div class="px-4 py-3 hover:bg-green-50 cursor-pointer border-b border-gray-50 flex items-center justify-between gap-3 transition-colors" onclick="switchView('loyalty'); closeBellDropdown();">
+                    <div class="flex-1 min-w-0">
+                        <p class="text-sm font-black text-gray-800 truncate">${c.customer_name}</p>
+                        <p class="text-xs text-gray-500">${c.customer_phone} · ${c.current_cycle_orders} pedidos</p>
+                    </div>
+                    <span class="flex-shrink-0 inline-block bg-green-100 text-green-700 px-2 py-1 rounded-full text-[9px] font-black uppercase">Premio</span>
+                </div>
+            `).join('');
+            lucide.createIcons({ nodes: [list] });
+        }
+
+        // Close dropdown when clicking outside
+        document.addEventListener('click', (e) => {
+            const container = document.getElementById('bellContainer');
+            if (container && !container.contains(e.target)) {
+                closeBellDropdown();
+            }
+        });
+
+        // ── LOYALTY PAGINATION STATE ──
+        let loyaltyCurrentPage = 1;
+        let loyaltyTotalPages = 1;
+        let loyaltySearchTerm = '';
+        let loyaltySearchTimeout = null;
+
         function renderLoyalty(data) {
                 const customers = data.customers || [];
                 const settings = data.settings || [];
+                const pagination = data.pagination || { current_page: 1, total: 0, total_pages: 1, per_page: 20 };
                 const requiredSetting = settings.find(s => s.key === 'loyalty_required_orders');
                 const messageSetting = settings.find(s => s.key === 'loyalty_message_template');
 
                 document.getElementById('loyaltyRequiredInput').value = requiredSetting?.value ?? 15;
                 document.getElementById('loyaltyMessageInput').value = messageSetting?.value ?? '¡Felicidades! Tienes un regalo por tus 15 pedidos.';
+
+                // Update pagination state
+                loyaltyCurrentPage = pagination.current_page;
+                loyaltyTotalPages = pagination.total_pages;
 
                 const tbody = document.getElementById('loyaltyTableBody');
                 tbody.innerHTML = customers.length ? customers.map(customer => `
@@ -1138,7 +1275,61 @@
                             <td colspan="4" class="px-6 py-10 text-center text-gray-500">No hay clientes con pedidos aceptados todavía.</td>
                         </tr>
                 `;
+
+                // Update pagination UI
+                document.getElementById('loyaltyPaginationInfo').textContent = pagination.total > 0
+                    ? `${pagination.total} cliente${pagination.total !== 1 ? 's' : ''} en total`
+                    : '';
+                document.getElementById('loyaltyPageIndicator').textContent = pagination.total_pages > 1
+                    ? `${pagination.current_page} / ${pagination.total_pages}`
+                    : '';
+                document.getElementById('loyaltyPrevBtn').disabled = pagination.current_page <= 1;
+                document.getElementById('loyaltyNextBtn').disabled = pagination.current_page >= pagination.total_pages;
+
+                // Update bell badge
+                if (typeof data.reward_ready_count !== 'undefined') {
+                    updateLoyaltyBell(data.reward_ready_count);
+                }
         }
+
+        function changeLoyaltyPage(direction) {
+            const newPage = loyaltyCurrentPage + direction;
+            if (newPage < 1 || newPage > loyaltyTotalPages) return;
+            loyaltyCurrentPage = newPage;
+            loadLoyaltyData();
+        }
+
+        function loadLoyaltyData() {
+            const params = new URLSearchParams({
+                route: 'loyalty',
+                page: loyaltyCurrentPage,
+                per_page: 20,
+            });
+            if (loyaltySearchTerm) params.set('search', loyaltySearchTerm);
+
+            fetch(`${apiBase}/admin-api.php?${params.toString()}`)
+                .then(r => r.json())
+                .then(data => {
+                    dataCache.loyalty = data;
+                    renderLoyalty(data);
+                })
+                .catch(err => console.error('Error loading loyalty:', err));
+        }
+
+        // Search debounce
+        document.addEventListener('DOMContentLoaded', () => {
+            const searchInput = document.getElementById('loyaltySearchInput');
+            if (searchInput) {
+                searchInput.addEventListener('input', (e) => {
+                    clearTimeout(loyaltySearchTimeout);
+                    loyaltySearchTimeout = setTimeout(() => {
+                        loyaltySearchTerm = e.target.value.trim();
+                        loyaltyCurrentPage = 1;
+                        loadLoyaltyData();
+                    }, 400);
+                });
+            }
+        });
 
     // --- MODALS ---
 
@@ -1409,7 +1600,7 @@
                     <button onclick="closeModal()" class="text-gray-400 hover:text-red-600 transition-colors text-2xl leading-none">&times;</button>
                 </div>
                 <div class="text-center py-8">
-                    <p class="text-red-600 font-bold mb-4">⚠️ No hay categorías disponibles</p>
+                    <p class="text-red-600 font-bold mb-4">No hay categorías disponibles</p>
                     <p class="text-gray-500 text-sm mb-6">Debes crear al menos una categoría antes de agregar ingredientes.</p>
                     <button onclick="closeModal(); switchView('categories')" class="bg-red-600 text-white px-6 py-3 rounded-2xl font-black">
                         IR A CATEGORÍAS
@@ -1497,15 +1688,15 @@
                 <div class="md:col-span-2 bg-red-50 rounded-2xl p-4 border border-red-100 flex items-center justify-between">
                     <div>
                         <div class="flex items-center gap-2 mb-0.5">
-                            <span class="text-lg">${order.delivery_type === 'domicilio' ? '🛵' : order.delivery_type === 'local' ? '🍽️' : '🥡'}</span>
+                            <span class="text-lg">${order.delivery_type === 'domicilio' ? '<i data-lucide="bike" class="w-4 h-4 inline"></i>' : order.delivery_type === 'local' ? '<i data-lucide="utensils-crossed" class="w-4 h-4 inline"></i>' : '<i data-lucide="shopping-bag" class="w-4 h-4 inline"></i>'}</span>
                             <span class="font-black uppercase tracking-[0.2em] text-red-700 text-[9px]">${order.delivery_type}</span>
                         </div>
                         <div class="text-base font-black text-gray-800 uppercase tracking-tighter">
-                            ${order.delivery_type === 'domicilio' && order.customer_address ? `📍 ${order.customer_address}` : 
-                              order.delivery_type === 'local' && order.table_number ? `🪑 Mesa ${order.table_number}` : 
+                            ${order.delivery_type === 'domicilio' && order.customer_address ? `<i data-lucide="map-pin" class="w-3.5 h-3.5 inline"></i> ${order.customer_address}` : 
+                              order.delivery_type === 'local' && order.table_number ? `<i data-lucide="armchair" class="w-3.5 h-3.5 inline"></i> Mesa ${order.table_number}` : 
                               'Retira en el local'}
                         </div>
-                        ${order.observations ? `<div class="mt-2 p-2 bg-yellow-50 border-l-2 border-yellow-400 rounded"><p class="text-[10px] font-black text-yellow-700 uppercase">📝 Observaciones:</p><p class="text-xs font-bold text-yellow-800">${order.observations}</p></div>` : ''}
+                        ${order.observations ? `<div class="mt-2 p-2 bg-yellow-50 border-l-2 border-yellow-400 rounded"><p class="text-[10px] font-black text-yellow-700 uppercase"><i data-lucide="file-text" class="w-3 h-3 inline"></i> Observaciones:</p><p class="text-xs font-bold text-yellow-800">${order.observations}</p></div>` : ''}
                         ${(() => {
                             // Generar resumen de categorías marcadas como show_in_summary
                             const summaryCategories = dataCache.categories.filter(c => c.show_in_summary === 1 || c.show_in_summary === '1');
@@ -1535,7 +1726,7 @@
                             if (summaryItems.length === 0) return '';
                             
                             return `<div class="mt-2 p-2 bg-blue-50 border-l-2 border-blue-400 rounded">
-                                <p class="text-[10px] font-black text-blue-700 uppercase mb-1">📋 Resumen:</p>
+                                <p class="text-[10px] font-black text-blue-700 uppercase mb-1">Resumen:</p>
                                 ${summaryItems.map(item => `
                                     <p class="text-xs font-bold text-blue-800">
                                         <span class="font-black">${item.category}:</span> ${item.options.join(', ')}
@@ -1601,13 +1792,13 @@
 
             <div class="mt-4 pt-4 border-t flex gap-3">
                 ${order.status === 'pendiente' ? `
-                    <button onclick="acceptOrderFlow(${order.id}); closeModal();" class="flex-[2] py-4 bg-green-500 text-white rounded-2xl font-black shadow-xl hover:bg-green-600 transition-all uppercase tracking-widest text-sm transform hover:scale-[1.02] active:scale-95">✓ CONFIRMAR Y PREPARAR</button>
-                    <button onclick="updateOrderStatus(${order.id}, 'cancelado'); closeModal();" class="flex-1 py-4 bg-red-100 text-red-600 rounded-2xl font-black hover:bg-red-200 transition-all uppercase tracking-widest text-xs">✕ RECHAZAR</button>
+                    <button onclick="acceptOrderFlow(${order.id}); closeModal();" class="flex-[2] py-4 bg-green-500 text-white rounded-2xl font-black shadow-xl hover:bg-green-600 transition-all uppercase tracking-widest text-sm transform hover:scale-[1.02] active:scale-95"><i data-lucide="check" class="w-4 h-4 inline mr-1"></i>CONFIRMAR Y PREPARAR</button>
+                    <button onclick="updateOrderStatus(${order.id}, 'cancelado'); closeModal();" class="flex-1 py-4 bg-red-100 text-red-600 rounded-2xl font-black hover:bg-red-200 transition-all uppercase tracking-widest text-xs"><i data-lucide="x" class="w-4 h-4 inline mr-1"></i>RECHAZAR</button>
                 ` : `
                     ${order.status === 'aceptado' && order.customer_phone ? `
-                        <button onclick="sendWhatsApp(dataCache.orders.find(o=>o.id==${order.id}))" class="flex-1 py-4 bg-green-100 text-green-700 rounded-2xl font-black hover:bg-green-200 transition-all uppercase tracking-widest text-xs">💬 REENVIAR WHATSAPP</button>
+                        <button onclick="sendWhatsApp(dataCache.orders.find(o=>o.id==${order.id}))" class="flex-1 py-4 bg-[#25D366]/10 text-[#25D366] rounded-2xl font-black hover:bg-[#25D366]/20 transition-all uppercase tracking-widest text-xs"><svg class="w-4 h-4 inline mr-1" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>REENVIAR WHATSAPP</button>
                     ` : ''}
-                    <button onclick="window.open('${apiBase}/admin-api.php?route=orders/${order.id}/print')" class="flex-[2] py-4 bg-slate-800 text-white rounded-2xl font-black shadow-xl hover:bg-slate-900 transition-all uppercase tracking-widest text-sm transform hover:scale-[1.02] active:scale-95">🖨️ IMPRIMIR TICKET</button>
+                    <button onclick="window.open('${apiBase}/admin-api.php?route=orders/${order.id}/print')" class="flex-[2] py-4 bg-slate-800 text-white rounded-2xl font-black shadow-xl hover:bg-slate-900 transition-all uppercase tracking-widest text-sm transform hover:scale-[1.02] active:scale-95"><i data-lucide="printer" class="w-4 h-4 inline mr-1"></i>IMPRIMIR TICKET</button>
                     <button onclick="closeModal()" class="flex-1 py-4 bg-gray-100 text-gray-500 rounded-2xl font-black hover:bg-gray-200 transition-all uppercase tracking-widest text-xs">CERRAR</button>
                 `}
             </div>
@@ -1766,8 +1957,11 @@
         msgEl.textContent   = order?.customer_phone
             ? '¿Deseas enviar el mensaje de WhatsApp al cliente?'
             : 'El cliente no tiene teléfono registrado. Se aceptará sin WhatsApp.';
-        yesBtn.textContent  = order?.customer_phone ? '✅ Sí, enviar WhatsApp' : '✅ Aceptar';
-        noBtn.textContent   = order?.customer_phone ? '🚫 No, solo aceptar'   : 'Cancelar';
+        yesBtn.innerHTML  = order?.customer_phone ? '<svg class="w-4 h-4 inline mr-1" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>Sí, enviar WhatsApp' : '<i data-lucide="check" class="w-4 h-4 inline mr-1"></i>Aceptar';
+        noBtn.innerHTML   = order?.customer_phone ? '<i data-lucide="x" class="w-4 h-4 inline mr-1"></i>No, solo aceptar' : 'Cancelar';
+        // Estilos: verde para aceptar/WhatsApp, gris para "no"
+        yesBtn.className = 'flex-1 py-4 bg-green-600 text-white rounded-2xl font-black shadow-lg hover:bg-green-700 transition-all uppercase text-xs';
+        noBtn.className  = 'flex-1 py-4 bg-gray-100 text-gray-500 rounded-2xl font-black hover:bg-gray-200 transition-all uppercase text-xs';
 
         overlay.classList.remove('hidden');
 
@@ -1775,9 +1969,11 @@
             overlay.classList.add('hidden');
             yesBtn.onclick = null;
             noBtn.onclick  = null;
-            // Restaurar textos por defecto del modal de confirmación genérico
+            // Restaurar estilos y textos por defecto del modal de confirmación genérico
             yesBtn.textContent = 'Sí, borrar';
             noBtn.textContent  = 'Mejor no';
+            yesBtn.className = 'flex-1 py-4 bg-red-600 text-white rounded-2xl font-black shadow-lg hover:bg-red-700 transition-all uppercase text-xs';
+            noBtn.className  = 'flex-1 py-4 bg-gray-100 text-gray-400 rounded-2xl font-black hover:bg-gray-200 transition-all uppercase text-xs';
             titleEl.textContent = '¿Estás seguro?';
             msgEl.textContent   = 'Esta acción no se puede deshacer fácilmente.';
         };
@@ -1814,8 +2010,11 @@
         msgEl.textContent   = order?.customer_phone
             ? '¿Deseas enviar el mensaje de WhatsApp al cliente informando la cancelación?'
             : 'El cliente no tiene teléfono registrado. Se cancelará sin WhatsApp.';
-        yesBtn.textContent  = order?.customer_phone ? '✅ Sí, enviar WhatsApp' : '✅ Cancelar';
-        noBtn.textContent   = order?.customer_phone ? '🚫 No, solo cancelar'   : 'Volver';
+        yesBtn.innerHTML  = order?.customer_phone ? '<svg class="w-4 h-4 inline mr-1" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>Sí, enviar WhatsApp' : '<i data-lucide="x" class="w-4 h-4 inline mr-1"></i>Cancelar';
+        noBtn.innerHTML   = order?.customer_phone ? '<i data-lucide="ban" class="w-4 h-4 inline mr-1"></i>No, solo cancelar' : 'Volver';
+        // Estilos: rojo para cancelar/WhatsApp, gris para "no"
+        yesBtn.className = 'flex-1 py-4 bg-red-600 text-white rounded-2xl font-black shadow-lg hover:bg-red-700 transition-all uppercase text-xs';
+        noBtn.className  = 'flex-1 py-4 bg-gray-100 text-gray-500 rounded-2xl font-black hover:bg-gray-200 transition-all uppercase text-xs';
 
         overlay.classList.remove('hidden');
 
@@ -1825,6 +2024,8 @@
             noBtn.onclick  = null;
             yesBtn.textContent = 'Sí, borrar';
             noBtn.textContent  = 'Mejor no';
+            yesBtn.className = 'flex-1 py-4 bg-red-600 text-white rounded-2xl font-black shadow-lg hover:bg-red-700 transition-all uppercase text-xs';
+            noBtn.className  = 'flex-1 py-4 bg-gray-100 text-gray-400 rounded-2xl font-black hover:bg-gray-200 transition-all uppercase text-xs';
             titleEl.textContent = '¿Estás seguro?';
             msgEl.textContent   = 'Esta acción no se puede deshacer fácilmente.';
         };
@@ -1872,8 +2073,44 @@
         if (diff > 10 && currentView !== 'settings') loadViewData();
     }, 1000);
 
+    // ── Bell Polling (every 30s) ──
+    function pollLoyaltyBadge() {
+        fetch(`${apiBase}/admin-api.php?route=loyalty/badge`)
+            .then(r => { if (r.ok) return r.json(); throw new Error('not ok'); })
+            .then(data => {
+                if (typeof data.reward_ready_count !== 'undefined') {
+                    updateLoyaltyBell(data.reward_ready_count);
+                }
+            })
+            .catch(() => {}); // silently fail
+    }
+    // Initial badge load + interval
+    pollLoyaltyBadge();
+    setInterval(pollLoyaltyBadge, 30000);
+
     // Initial Load
     document.addEventListener('DOMContentLoaded', async () => {
+        // Initialize Lucide icons
+        lucide.createIcons();
+
+        // Auto-refresh Lucide icons when modal overlay becomes visible
+        const modalOverlay = document.getElementById('modalOverlay');
+        if (modalOverlay) {
+            new MutationObserver(() => {
+                if (!modalOverlay.classList.contains('hidden')) {
+                    lucide.createIcons();
+                }
+            }).observe(modalOverlay, { attributes: true, attributeFilter: ['class'] });
+        }
+        const confirmOverlay = document.getElementById('confirmOverlay');
+        if (confirmOverlay) {
+            new MutationObserver(() => {
+                if (!confirmOverlay.classList.contains('hidden')) {
+                    lucide.createIcons();
+                }
+            }).observe(confirmOverlay, { attributes: true, attributeFilter: ['class'] });
+        }
+
         // Verificar sesion real contra el servidor
         try {
             const authResp = await fetch('/admin-api.php?route=admin-check', { credentials: 'include' });
@@ -1911,7 +2148,7 @@
             const textEl = document.getElementById('storeStatusText');
             
             switchEl.checked = isOpen;
-            textEl.textContent = isOpen ? '🟢 ABIERTO' : '🔴 CERRADO';
+            textEl.textContent = isOpen ? 'ABIERTO' : 'CERRADO';
             textEl.className = isOpen 
                 ? 'text-sm font-black uppercase tracking-wider text-green-600'
                 : 'text-sm font-black uppercase tracking-wider text-red-600';
@@ -1926,7 +2163,7 @@
         const textEl = document.getElementById('storeStatusText');
         
         try {
-            textEl.textContent = '⏳ GUARDANDO...';
+            textEl.textContent = 'GUARDANDO...';
             textEl.className = 'text-sm font-black uppercase tracking-wider text-gray-400';
             
             await fetch(`${apiBase}/admin-api.php?route=settings`, {
@@ -1938,7 +2175,7 @@
                 })
             });
             
-            textEl.textContent = isOpen ? '🟢 ABIERTO' : '🔴 CERRADO';
+            textEl.textContent = isOpen ? 'ABIERTO' : 'CERRADO';
             textEl.className = isOpen 
                 ? 'text-sm font-black uppercase tracking-wider text-green-600'
                 : 'text-sm font-black uppercase tracking-wider text-red-600';

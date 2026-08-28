@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { IoCart, IoHome, IoSparkles } from 'react-icons/io5';
 
 export default function BurritoBuilder({ onCheckout, initialCart = [], showToast }) {
   const [categories,  setCategories]  = useState([]);
@@ -262,7 +263,7 @@ export default function BurritoBuilder({ onCheckout, initialCart = [], showToast
           </div>
           <button onClick={goToCheckout}
             className="relative bg-yellow-400 text-red-700 px-5 py-2.5 rounded-2xl font-black flex items-center gap-2 hover:bg-yellow-300 transform active:scale-95 transition-all shadow-lg">
-            <span className="text-xl">🛒</span>
+            <IoCart className="w-5 h-5" />
             {cart.length > 0 && (
               <span className="absolute -top-2 -right-2 bg-white text-red-600 w-6 h-6 rounded-full flex items-center justify-center text-xs shadow-md border-2 border-red-600">
                 {cart.length}
@@ -308,7 +309,7 @@ export default function BurritoBuilder({ onCheckout, initialCart = [], showToast
               onClick={() => setProductType(null)}
               className="w-14 h-14 bg-white rounded-full shadow-lg border border-gray-100 text-2xl flex items-center justify-center hover:bg-gray-50 hover:shadow-xl transition-all active:scale-95"
             >
-              🏠
+              <IoHome className="w-6 h-6 text-gray-600" />
             </button>
           </div>
 
@@ -337,8 +338,8 @@ export default function BurritoBuilder({ onCheckout, initialCart = [], showToast
                 </p>
                 {v.description && (
                   <div className="mt-4 pt-3 border-t border-gray-100 w-full group-hover:border-orange-200 transition-colors">
-                    <p className="text-[9px] font-black text-orange-500 uppercase tracking-[0.15em] mb-1">
-                      ✨ INGREDIENTES INCLUIDOS:
+                    <p className="text-[9px] font-black text-orange-500 uppercase tracking-[0.15em] mb-1 flex items-center gap-1">
+                      <IoSparkles className="w-3 h-3" /> INGREDIENTES INCLUIDOS:
                     </p>
                     <p className="text-gray-600 text-[11px] font-bold leading-tight px-2 italic">
                       {v.description}
@@ -384,7 +385,7 @@ export default function BurritoBuilder({ onCheckout, initialCart = [], showToast
               onClick={() => { setProductType(null); setSelectedVariation(null); setStep(1); }}
               className="w-12 h-12 sm:w-16 sm:h-16 bg-gray-100 rounded-full text-xl sm:text-3xl shadow-inner flex items-center justify-center hover:bg-gray-200 transition-colors shrink-0 active:scale-95"
             >
-              🏠
+              <IoHome className="w-5 h-5 sm:w-7 sm:h-7 text-gray-500" />
             </button>
 
             {/* Círculos numerados */}

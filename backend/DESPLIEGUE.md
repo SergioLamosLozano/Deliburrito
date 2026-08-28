@@ -133,3 +133,57 @@ RewriteCond %{REQUEST_FILENAME} !-d
 RewriteCond %{REQUEST_FILENAME} !-f
 RewriteRule ^ index.php [L]
 ```
+
+---
+
+## Actualizacion: Modulo de Fidelizacion + Iconos (Agosto 2026)
+
+### SQL a ejecutar en phpMyAdmin
+
+Archivo: `backend/database/sql_updates/create_loyalty_customers_table.sql`
+
+```sql
+CREATE TABLE IF NOT EXISTS `loyalty_customers` (
+    `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    `customer_phone` VARCHAR(255) NOT NULL,
+    `last_customer_name` VARCHAR(255) NULL DEFAULT NULL,
+    `last_redeemed_orders_total` INT UNSIGNED NOT NULL DEFAULT 0,
+    `last_redeemed_at` TIMESTAMP NULL DEFAULT NULL,
+    `created_at` TIMESTAMP NULL DEFAULT NULL,
+    `updated_at` TIMESTAMP NULL DEFAULT NULL,
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `loyalty_customers_customer_phone_unique` (`customer_phone`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+INSERT INTO `settings` (`key`, `value`, `description`, `created_at`, `updated_at`)
+VALUES ('loyalty_required_orders', '15', 'Cantidad de pedidos requeridos para premio', NOW(), NOW())
+ON DUPLICATE KEY UPDATE `key` = `key`;
+
+INSERT INTO `settings` (`key`, `value`, `description`, `created_at`, `updated_at`)
+VALUES ('loyalty_message_template', '¡Felicidades! Tienes un regalo por tus 15 pedidos.', 'Plantilla del mensaje de fidelización', NOW(), NOW())
+ON DUPLICATE KEY UPDATE `key` = `key`;
+```
+
+### Archivos a subir a cPanel
+
+| Archivo local | Destino en cPanel | Que cambio |
+|---|---|---|
+| `backend/public/admin-api.php` | `public_html/admin-api.php` | Paginacion loyalty, endpoint /loyalty/badge, fix telefono |
+| `backend/public/admin/index.html` | `public_html/admin/index.html` | Tabla paginada, campanita, Lucide icons, colores modales |
+| `backend/public/index.html` | `public_html/index.html` | Nuevo build del frontend (referencia al JS actualizado) |
+| `backend/public/assets/index-*.js` | `public_html/assets/index-*.js` | Build con react-icons (reemplaza el viejo) |
+
+### Pasos
+
+1. Ejecutar el SQL de arriba en phpMyAdmin
+2. Subir los 4 archivos listados
+3. Eliminar los `index-*.js` viejos en `/assets/` (dejar solo el nuevo)
+4. Hacer hard refresh (Ctrl+Shift+R) en el admin para cargar Lucide desde CDN
+
+### Que se agrego
+
+- Modulo de fidelizacion: tabla de clientes con paginacion, busqueda, premio por ciclo de pedidos
+- Campanita de notificaciones: badge con polling cada 30s, dropdown con clientes premiados
+- Iconos Lucide (admin) y react-icons (cliente) reemplazando todos los emojis
+- Colores contextuales en modales de confirmar/cancelar pedido
+- Icono WhatsApp real en todos los botones de mensajeria

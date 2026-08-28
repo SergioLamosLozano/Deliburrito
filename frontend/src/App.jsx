@@ -1,4 +1,6 @@
 import React, { useState } from 'react';
+import { IoCheckmarkCircle, IoCloseCircle, IoLockClosed, IoBan } from 'react-icons/io5';
+import { FaCheck } from 'react-icons/fa';
 import BurritoBuilder from './components/BurritoBuilder';
 import Checkout from './components/Checkout';
 import OrderSuccess from './components/OrderSuccess';
@@ -197,7 +199,7 @@ export default function App(){
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[200] flex items-center justify-center p-4 animate-in fade-in duration-200">
           <div className="bg-white rounded-[2.5rem] p-8 max-w-md w-full shadow-2xl border-4 border-yellow-400 animate-in zoom-in duration-300">
             <div className="text-center mb-6">
-              <span className="text-5xl mb-4 block">🍔</span>
+              <span className="text-5xl mb-4 block"><IoCheckmarkCircle className="w-12 h-12 text-yellow-500 mx-auto" /></span>
               <h2 className="text-2xl font-black text-gray-800 uppercase tracking-tighter mb-2">
                 ¿Duplicar con adicionales?
               </h2>
@@ -209,15 +211,15 @@ export default function App(){
             <div className="space-y-3">
               <button
                 onClick={() => duplicateWithAddons(true)}
-                className="w-full py-4 bg-green-600 text-white rounded-2xl font-black text-lg shadow-xl hover:bg-green-700 active:scale-95 transition-all"
+                className="w-full py-4 bg-green-600 text-white rounded-2xl font-black text-lg shadow-xl hover:bg-green-700 active:scale-95 transition-all flex items-center justify-center gap-2"
               >
-                ✅ SÍ, CON ADICIONALES
+                <FaCheck className="w-4 h-4" /> SÍ, CON ADICIONALES
               </button>
               <button
                 onClick={() => duplicateWithAddons(false)}
-                className="w-full py-4 bg-orange-600 text-white rounded-2xl font-black text-lg shadow-xl hover:bg-orange-700 active:scale-95 transition-all"
+                className="w-full py-4 bg-orange-600 text-white rounded-2xl font-black text-lg shadow-xl hover:bg-orange-700 active:scale-95 transition-all flex items-center justify-center gap-2"
               >
-                🚫 NO, SIN ADICIONALES
+                <IoBan className="w-4 h-4" /> NO, SIN ADICIONALES
               </button>
               <button
                 onClick={() => {
@@ -241,7 +243,7 @@ export default function App(){
             animate-in slide-in-from-right duration-500 transform transition-all
             ${t.type === 'success' ? 'border-green-100 text-green-800' : 'border-red-100 text-red-800'}
           `}>
-            <span className="text-2xl">{t.type === 'success' ? '✅' : '❌'}</span>
+            <span className="text-2xl">{t.type === 'success' ? <IoCheckmarkCircle className="w-6 h-6 text-green-500" /> : <IoCloseCircle className="w-6 h-6 text-red-500" />}</span>
             <div>
               <p className="font-black uppercase text-[10px] tracking-widest opacity-50">{t.type === 'success' ? 'Éxito' : 'Atención'}</p>
               <p className="font-bold text-sm leading-tight">{t.message}</p>
@@ -255,7 +257,7 @@ export default function App(){
         <div className="fixed inset-0 bg-black/90 backdrop-blur-md z-[300] flex items-center justify-center p-4">
           <div className="bg-white rounded-[3rem] p-8 sm:p-12 max-w-full sm:max-w-lg w-full shadow-2xl border-4 border-red-600 text-center animate-in zoom-in duration-500 max-h-[90vh] overflow-y-auto">
             <div className="mb-8">
-              <span className="text-7xl sm:text-8xl mb-6 block animate-pulse">🔒</span>
+              <span className="text-7xl sm:text-8xl mb-6 block animate-pulse"><IoLockClosed className="w-20 h-20 sm:w-24 sm:h-24 text-red-500 mx-auto" /></span>
               <h2 className="text-3xl sm:text-4xl font-black text-red-600 uppercase tracking-tighter mb-4">
                 ¡Lo sentimos!
               </h2>

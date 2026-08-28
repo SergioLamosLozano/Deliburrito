@@ -1,79 +1,107 @@
-# Deliburrito
+# Deli Burrito
 
-Resumen breve
-- Deliburrito es una aplicación minimalista para tomar pedidos (frontend React + Vite + Tailwind, y backend PHP + MySQL).
-- El frontend (cliente) es una SPA desarrollada con React; el backend ofrece una API REST mínima y páginas estáticas de administración.
+Sistema de pedidos en linea para restaurante de comida rapida. Constructor de pedidos dinamico para clientes + panel de administracion en tiempo real.
 
-Estructura del proyecto
-- `frontend/` — código fuente del cliente (React + Vite).
-  - `frontend/src/` — componentes React y fuentes.
-  - `frontend/dist/` — build de producción (assets compilados).
-  - `frontend/vite.config.js` — configuración del servidor dev y proxy.
-- `backend/` — servidor y API PHP.
-  - `backend/public/` — carpeta pública servida por PHP (páginas admin y, opcionalmente, assets `dist`).
-  - `backend/public/api.php` — entrada principal de la API (routing por `?route=...`).
-  - `backend/public/admin/` — páginas estáticas del panel administrativo.
+## Stack
 
-Base de datos
-- Motor: MySQL 8+ (ejemplo usado en desarrollo).
-- Tablas principales: `categories`, `options`, `orders`, `order_items`, `order_item_options`.
-- Nota de seguridad: no incluyas credenciales en el repo. Usa variables de entorno o un archivo de configuración local que esté en `.gitignore`.
+- **Frontend cliente:** React 18, Vite, Tailwind CSS, react-icons
+- **Panel admin:** HTML/JS vanilla, Tailwind (CDN), Lucide Icons (CDN)
+- **Backend/API:** PHP puro (`admin-api.php`) — sin framework en runtime
+- **Base de datos:** MySQL 8+
+- **Framework (migraciones/modelos):** Laravel 11 (solo para tooling, seeders y migraciones)
 
-Rutas y API
-- API entry: `backend/public/api.php?route=...`.
-  - `route=orders` — POST para crear pedidos, GET para listar.
-  - Otras rutas: `categories`, `options`, `reports`, y acciones para aceptar/cancelar/imprimir pedidos. Revisa `api.php` para la lista completa y detalles.
+## Estructura del proyecto
 
-Flujos de trabajo
-- Desarrollo (recomendado):
-  1. Levantar backend (PHP built-in):
-     ```powershell
-     cd "C:\Users\sergi\Desktop\Deliburrito 2\backend"
-     php -S localhost:8000 -t public
-     ```
-  2. Levantar frontend (Vite) con HMR:
-     ```powershell
-     cd "C:\Users\sergi\Desktop\Deliburrito 2\frontend"
-     npm install    # si no están instaladas las dependencias
-     npm run dev
-     ```
-  3. Acceder a la app cliente en `http://localhost:5173` y al admin en `http://localhost:8000/admin/`.
+```
+frontend/               → Codigo fuente React (cliente)
+frontend/src/           → Componentes React
+frontend/vite.config.js → Proxy a backend + output a backend/public
 
-- Producción (servir desde backend):
-  1. Generar build del frontend:
-     ```powershell
-     cd "C:\Users\sergi\Desktop\Deliburrito 2\frontend"
-     npm run build
-     ```
-  2. Copiar `frontend/dist` dentro de `backend/public` (por ejemplo en `backend/public/dist`) o actualizar las referencias en las páginas admin para apuntar al build.
-  3. Servir `backend/public` con PHP/Apache/Nginx.
+backend/                → Servidor PHP + API + Admin
+backend/public/         → Carpeta publica (servida por PHP o Apache)
+backend/public/admin/   → Panel de administracion (SPA HTML)
+backend/public/admin-api.php → API REST del admin y del cliente
+backend/public/index.html    → Frontend compilado (output de Vite build)
+backend/public/assets/       → JS/CSS compilado del frontend
 
-Consideraciones técnicas y debugging
-- Vite proxy: en `frontend/vite.config.js` la proxy debe usar el formato objeto y `changeOrigin: true` para reenviar correctamente las peticiones al backend durante el desarrollo.
-- Tipo de IDs: el frontend debe enviar `option_id` numéricos que coincidan con la DB; strings o tokens custom pueden causar errores en el backend.
-- Routing: la API usa query-string (`?route=`) por compatibilidad con el servidor PHP embebido (evita depender de PATH_INFO en este entorno).
-- Manejo de errores: revisar logs del servidor PHP y las respuestas JSON del API para mensajes detallados.
+backend/database/migrations/   → Migraciones Laravel
+backend/database/seeders/      → Seeders de datos iniciales y prueba
+backend/database/sql_updates/  → SQL listos para ejecutar en phpMyAdmin (produccion)
+```
 
-Checklist para onboarding rápido
-- [ ] Importar la base de datos inicial y poblarla con datos (categorías, opciones).
-- [ ] Ajustar credenciales DB en configuración local (no subirlas).
-- [ ] En desarrollo: arrancar PHP y Vite como se indica arriba.
-- [ ] Si quieres solo el backend + UI estática, construir `frontend/dist` y copiarlo a `backend/public`.
+## Iniciar en desarrollo
 
-Archivos clave a revisar
-- `backend/public/api.php` — lógica y rutas del API.
-- `backend/public/admin/` — páginas del panel de administración.
-- `frontend/src/` — fuentes React (.jsx/.js) y componentes.
-- `frontend/vite.config.js` — configuración del dev server y proxy.
+Un solo comando levanta todo (frontend compilado + admin + API):
 
-Si necesitas que prepare comandos de despliegue, scripts de base de datos, o un `.env.example`, dímelo y lo agrego.
+```powershell
+cd backend
+php -S localhost:8000 -t public
+```
 
--- Fin --
-# Deli Burrito — Proyecto
+Accesos:
+- Cliente: http://localhost:8000
+- Admin: http://localhost:8000/admin/
 
-Estructura inicial generada automáticamente: migraciones, modelos y seeders (Fase 1), y un ejemplo de frontend React adaptado del HTML provisto.
+### Modo desarrollo con HMR (opcional)
 
-Siguientes pasos:
-- Revisar migraciones y modelos.
-- Ejecutar `composer install` y `php artisan migrate --seed` en un entorno Laravel.
-- Compilar assets del frontend localmente y desplegar `public` en hosting compartido.
+Si vas a editar el frontend React y quieres hot reload:
+
+```powershell
+# Terminal 1 — Backend
+cd backend
+php -S localhost:8000 -t public
+
+# Terminal 2 — Frontend con HMR
+cd frontend
+npm install
+npm run dev
+```
+
+Con Vite corriendo, el cliente se ve en http://localhost:5173 (proxy automatico al backend).
+
+## Compilar frontend para produccion
+
+```powershell
+cd frontend
+npm run build
+```
+
+Esto genera `backend/public/index.html` y `backend/public/assets/index-*.js` que son los archivos que se suben a produccion.
+
+**Importante:** Despues del build, eliminar los `index-*.js` viejos en `backend/public/assets/` y dejar solo el nuevo.
+
+## Base de datos
+
+### Desarrollo (primera vez)
+
+```powershell
+cd backend
+composer install
+php artisan migrate --seed
+```
+
+### Produccion (actualizaciones)
+
+Los cambios de BD se aplican via phpMyAdmin usando los archivos SQL en:
+`backend/database/sql_updates/`
+
+Cada archivo SQL tiene un comentario con la fecha y lo que hace.
+
+## Despliegue a produccion (cPanel)
+
+Ver `backend/DESPLIEGUE.md` para la guia completa.
+
+Resumen rapido de una actualizacion:
+1. Compilar frontend: `npm run build` en `/frontend`
+2. Ejecutar SQL en phpMyAdmin (si hay cambios de BD)
+3. Subir archivos modificados via cPanel File Manager
+4. Eliminar assets JS viejos en `/assets/`
+
+## Documentacion adicional
+
+| Archivo | Contenido |
+|---|---|
+| `backend/DESPLIEGUE.md` | Guia de despliegue a cPanel paso a paso |
+| `FIDELIZACION.md` | Modulo de fidelizacion — logica y flujo |
+| `ANALISIS_ARQUITECTURA_Y_BD.md` | Arquitectura del sistema y modelo de datos |
+| `SECURITY_AUDIT.md` | Auditoria de seguridad y parches aplicados |

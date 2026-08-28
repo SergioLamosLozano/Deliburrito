@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { IoArrowBack, IoTrashOutline, IoInformationCircle, IoFlame, IoCopy } from 'react-icons/io5';
 
 // ── Helper: lee el token CSRF de la cookie que Laravel establece ──────────
 function getCsrfToken() {
@@ -97,7 +98,7 @@ export default function Checkout({ cartItems, onBack, onSuccess, onRemoveItem, o
         
         {/* HEADER COMPACTO */}
         <div className="flex items-center gap-4 mb-8">
-            <button onClick={onBack} className="p-3 bg-white rounded-full shadow-md text-xl hover:bg-gray-100 transition-all">⬅</button>
+            <button onClick={onBack} className="p-3 bg-white rounded-full shadow-md text-xl hover:bg-gray-100 transition-all"><IoArrowBack className="w-5 h-5 text-red-600" /></button>
             <h1 className="text-3xl font-black text-red-600 uppercase tracking-tighter">Tu Pedido</h1>
         </div>
 
@@ -129,17 +130,17 @@ export default function Checkout({ cartItems, onBack, onSuccess, onRemoveItem, o
                             <div className="flex flex-col gap-2">
                                 <button 
                                     onClick={() => onRemoveItem(item.id)}
-                                    className="bg-red-100 text-red-600 px-3 py-2 rounded-xl hover:bg-red-600 hover:text-white transition-all shadow-sm font-bold text-xs"
+                                    className="bg-red-100 text-red-600 px-3 py-2 rounded-xl hover:bg-red-600 hover:text-white transition-all shadow-sm font-bold text-xs flex items-center gap-1"
                                     title="Eliminar ítem"
                                 >
-                                    🗑️ Eliminar
+                                    <IoTrashOutline className="w-3.5 h-3.5" /> Eliminar
                                 </button>
                                 <button 
                                     onClick={() => onDuplicateItem(item.id)}
-                                    className="bg-blue-100 text-blue-600 px-3 py-2 rounded-xl hover:bg-blue-600 hover:text-white transition-all shadow-sm font-bold text-xs"
+                                    className="bg-blue-100 text-blue-600 px-3 py-2 rounded-xl hover:bg-blue-600 hover:text-white transition-all shadow-sm font-bold text-xs flex items-center gap-1"
                                     title="Duplicar ítem"
                                 >
-                                    Duplicar
+                                    <IoCopy className="w-3.5 h-3.5" /> Duplicar
                                 </button>
                             </div>
                         </div>
@@ -237,7 +238,7 @@ export default function Checkout({ cartItems, onBack, onSuccess, onRemoveItem, o
                 {formData.delivery_type === 'domicilio' && (
                     <div className="animate-in slide-in-from-top duration-300 space-y-4">
                     <div className="p-4 bg-blue-50 border-2 border-blue-100 rounded-2xl flex items-start gap-3">
-                        <span className="text-xl">ℹ️</span>
+                        <IoInformationCircle className="w-6 h-6 text-blue-500 flex-shrink-0 mt-0.5" />
                         <div>
                             <p className="text-xs font-black text-blue-700 uppercase">Nota sobre el envío</p>
                             <p className="text-[11px] text-blue-600 font-bold">El servicio a domicilio tiene un costo adicional de <span className="font-black text-blue-800">${dbSettings.costo_domicilio.toLocaleString()}</span> que ya se sumó a tu total.</p>
@@ -278,7 +279,7 @@ export default function Checkout({ cartItems, onBack, onSuccess, onRemoveItem, o
                         disabled={loading || cartItems.length === 0}
                         className="flex-1 py-5 bg-red-600 text-white rounded-3xl font-black text-lg shadow-xl hover:bg-red-700 active:scale-95 transition-all disabled:bg-gray-200"
                     >
-                        {loading ? 'ENVIANDO PEDIDO...' : '🔥 CONFIRMAR PEDIDO'}
+                        {loading ? 'ENVIANDO PEDIDO...' : <><IoFlame className="w-5 h-5 inline mr-1" />CONFIRMAR PEDIDO</>}
                     </button>
                 </div>
                 </form>
