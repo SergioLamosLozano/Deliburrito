@@ -1978,21 +1978,23 @@
             msgEl.textContent   = 'Esta acción no se puede deshacer fácilmente.';
         };
 
-        // "Sí" → aceptar + WhatsApp
+        // "Sí" → aceptar + WhatsApp + Imprimir comanda
         yesBtn.onclick = async () => {
             cleanUp();
             await fetch(`${apiBase}/admin-api.php?route=orders/${id}/aceptado`, { method: 'POST' });
             showToast('Pedido confirmado ✓', 'success');
             if (order?.customer_phone) sendWhatsApp(order);
+            window.open(`${apiBase}/admin-api.php?route=orders/${id}/print`, 'ImpresionComanda');
             loadViewData();
         };
 
-        // "No" → solo aceptar, sin WhatsApp
+        // "No" → solo aceptar, sin WhatsApp + Imprimir comanda
         noBtn.onclick = async () => {
             if (!order?.customer_phone) { cleanUp(); return; } // era el botón Cancelar
             cleanUp();
             await fetch(`${apiBase}/admin-api.php?route=orders/${id}/aceptado`, { method: 'POST' });
             showToast('Pedido confirmado ✓', 'success');
+            window.open(`${apiBase}/admin-api.php?route=orders/${id}/print`, 'ImpresionComanda');
             loadViewData();
         };
     };

@@ -706,7 +706,17 @@ function handlePrintOrder($db, $id) {
             }
         </style>
     </head>
-    <body class='p-4' onload='window.print()'>
+    <body class='p-4'>
+        <script>
+            window.addEventListener('afterprint', function() {
+                window.close();
+            });
+            window.addEventListener('load', function() {
+                setTimeout(function() {
+                    window.print();
+                }, 500);
+            });
+        </script>
         <div id='zona-impresion' class='text-black font-mono'>
 
             <!-- ENCABEZADO -->

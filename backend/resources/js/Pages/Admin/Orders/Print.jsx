@@ -1,8 +1,20 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 
 export default function Print({ order }) {
-  React.useEffect(() => {
-    window.print();
+  useEffect(() => {
+    // 1. Escuchar cuando la impresión termine (o se cancele) para cerrar la pestaña
+    const closeWindow = () => window.close();
+    window.addEventListener('afterprint', closeWindow);
+
+    // 2. Disparar la impresión tras un breve delay para renderizar CSS
+    const timer = setTimeout(() => {
+      window.print();
+    }, 500);
+
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener('afterprint', closeWindow);
+    };
   }, []);
 
   return (

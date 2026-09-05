@@ -17,6 +17,15 @@ export default function OrdersIndex({ orders }) {
         headers: { 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content },
       });
       const data = await response.json();
+
+      // Apertura de WhatsApp si el backend envía el enlace
+      if (data.wa_link) {
+        window.open(data.wa_link, '_blank');
+      }
+
+      // Impresión de comanda automática en pestaña en segundo plano
+      window.open(`/admin/orders/${orderId}/print`, 'ImpresionComanda');
+
       window.location.reload();
     } catch (err) {
       alert('Error al aceptar pedido');
