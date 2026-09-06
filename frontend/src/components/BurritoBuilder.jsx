@@ -248,7 +248,7 @@ export default function BurritoBuilder({ onCheckout, initialCart = [], showToast
 
       {/* Marca de agua */}
       <div className="fixed inset-0 flex items-center justify-center pointer-events-none z-0">
-        <img src="/deliburrito.webp" alt="" className="w-[480px] max-w-[70vw] opacity-[0.06] select-none" />
+        <img src="/deliburrit.webp" alt="" className="w-[480px] max-w-[70vw] opacity-[0.06] select-none" />
       </div>
 
       {/* Header */}
@@ -256,7 +256,7 @@ export default function BurritoBuilder({ onCheckout, initialCart = [], showToast
         <div className="max-w-6xl mx-auto flex justify-between items-center">
           <div className="cursor-pointer flex items-center gap-3"
             onClick={resetBuilder}>
-            <img src="/deliburrito.webp" alt="Deli Burrito" className="h-16 w-auto" />
+            <img src="/deliburritonuevologo.jpeg" alt="Deli Burrito" className="h-16 w-auto rounded-2xl border-2 border-[#7A0C0C] shadow-md shadow-red-950/50 object-cover" />
             <h1 className="text-2xl font-black italic tracking-tighter">
               DELI<span className="text-yellow-300">BURRITO</span>
             </h1>
