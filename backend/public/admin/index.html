@@ -54,6 +54,9 @@
         <button data-view="orders" class="nav-btn w-full flex items-center gap-3 px-6 py-4 rounded-2xl transition-all hover:bg-white/10 font-bold">
           <i data-lucide="package" class="w-5 h-5 text-yellow-300"></i> Pedidos
         </button>
+        <button data-view="tables" class="nav-btn w-full flex items-center gap-3 px-6 py-4 rounded-2xl transition-all hover:bg-white/10 font-bold">
+          <i data-lucide="qr-code" class="w-5 h-5 text-amber-300"></i> Control de Mesas
+        </button>
         <button data-view="categories" class="nav-btn w-full flex items-center gap-3 px-6 py-4 rounded-2xl transition-all hover:bg-white/10 font-bold">
           <i data-lucide="layers" class="w-5 h-5 text-orange-300"></i> Categorías
         </button>
@@ -288,6 +291,59 @@
                     </div>
                 </div>
 
+        <!-- View: Tables (Salas Multijugador) -->
+        <div id="view-tables" class="view-content hidden">
+          <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
+            <div>
+              <h3 class="text-2xl font-black text-gray-800 uppercase tracking-tight flex items-center gap-3">
+                <i data-lucide="qr-code" class="w-8 h-8 text-amber-500"></i>
+                Control de Mesas
+              </h3>
+              <p class="text-gray-500 text-sm mt-1">Supervisa en tiempo real las mesas activas, carritos colaborativos y códigos QR.</p>
+            </div>
+            <div class="flex items-center gap-3">
+              <button onclick="openCreateTableModal()" class="bg-red-600 hover:bg-red-700 text-white px-6 py-3.5 rounded-2xl font-black shadow-lg shadow-red-600/30 transition-all flex items-center gap-2 transform active:scale-95">
+                <i data-lucide="plus" class="w-5 h-5"></i>
+                AGREGAR NUEVA MESA
+              </button>
+            </div>
+          </div>
+
+          <!-- Resumen de Estados de Mesas -->
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
+            <div class="bg-white p-5 rounded-3xl border border-gray-100 shadow-sm flex items-center justify-between">
+              <div>
+                <p class="text-[10px] font-black uppercase tracking-wider text-gray-400">Total Mesas</p>
+                <p id="tablesStatsTotal" class="text-3xl font-black text-gray-800 mt-1">0</p>
+              </div>
+              <div class="w-12 h-12 bg-gray-100 rounded-2xl flex items-center justify-center text-gray-600 font-black">
+                <i data-lucide="layout-grid" class="w-6 h-6"></i>
+              </div>
+            </div>
+            <div class="bg-emerald-50/60 p-5 rounded-3xl border border-emerald-100 shadow-sm flex items-center justify-between">
+              <div>
+                <p class="text-[10px] font-black uppercase tracking-wider text-emerald-600">Mesas Libres</p>
+                <p id="tablesStatsFree" class="text-3xl font-black text-emerald-700 mt-1">0</p>
+              </div>
+              <div class="w-12 h-12 bg-emerald-100 rounded-2xl flex items-center justify-center text-emerald-600 font-black">
+                <i data-lucide="check-circle-2" class="w-6 h-6"></i>
+              </div>
+            </div>
+            <div class="bg-amber-50/60 p-5 rounded-3xl border border-amber-100 shadow-sm flex items-center justify-between">
+              <div>
+                <p class="text-[10px] font-black uppercase tracking-wider text-amber-600">Mesas Ocupadas</p>
+                <p id="tablesStatsOccupied" class="text-3xl font-black text-amber-700 mt-1">0</p>
+              </div>
+              <div class="w-12 h-12 bg-amber-100 rounded-2xl flex items-center justify-center text-amber-600 font-black">
+                <i data-lucide="users" class="w-6 h-6"></i>
+              </div>
+            </div>
+          </div>
+
+          <!-- Grid de Mesas -->
+          <div id="tablesGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6"></div>
+        </div>
+
         <!-- View: Settings -->
         <div id="view-settings" class="view-content hidden">
             <div class="max-w-2xl bg-white p-8 rounded-3xl shadow-sm border border-gray-100">
@@ -342,8 +398,11 @@
   </div>
 
   <!-- Custom Confirm Modal -->
-  <div id="confirmOverlay" class="fixed inset-0 bg-black/80 backdrop-blur-md z-[110] hidden flex items-center justify-center p-4">
-    <div class="bg-white w-full max-w-sm rounded-[2.5rem] shadow-2xl p-8 text-center border-4 border-yellow-400 animate-in zoom-in duration-300">
+  <div id="confirmOverlay" onclick="if(event.target === this) closeConfirmModal()" class="fixed inset-0 bg-black/80 backdrop-blur-md z-[110] hidden flex items-center justify-center p-4">
+    <div class="bg-white w-full max-w-sm rounded-[2.5rem] shadow-2xl p-8 text-center border-4 border-yellow-400 animate-in zoom-in duration-300 relative">
+        <button type="button" id="confirmCloseBtn" onclick="closeConfirmModal()" class="absolute top-5 right-5 w-9 h-9 bg-gray-100 hover:bg-red-50 text-gray-400 hover:text-red-600 rounded-full flex items-center justify-center font-black transition-all cursor-pointer" title="Cerrar sin realizar cambios">
+            ✕
+        </button>
         <div class="text-6xl mb-4"><i data-lucide="alert-triangle" class="w-16 h-16 text-yellow-500 mx-auto"></i></div>
         <h3 id="confirmTitle" class="text-2xl font-black uppercase tracking-tighter mb-2 text-gray-800">¿Estás seguro?</h3>
         <p id="confirmMessage" class="text-gray-500 font-bold mb-8 leading-tight uppercase text-[10px] tracking-widest">Esta acción no se puede deshacer fácilmente.</p>
@@ -351,6 +410,42 @@
             <button id="confirmCancel" class="flex-1 py-4 bg-gray-100 text-gray-400 rounded-2xl font-black hover:bg-gray-200 transition-all uppercase text-xs">Mejor no</button>
             <button id="confirmYes" class="flex-1 py-4 bg-red-600 text-white rounded-2xl font-black shadow-lg hover:bg-red-700 transition-all uppercase text-xs">Sí, borrar</button>
         </div>
+    </div>
+  </div>
+
+  <!-- Modal QR de Mesa -->
+  <div id="qrModalOverlay" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-[115] hidden flex items-center justify-center p-4">
+    <div class="bg-white w-full max-w-md rounded-[2.5rem] shadow-2xl p-8 border border-gray-100 relative animate-in zoom-in duration-300 text-center">
+      <button onclick="closeQrModal()" class="absolute top-6 right-6 w-10 h-10 bg-gray-100 hover:bg-gray-200 text-gray-500 rounded-full flex items-center justify-center font-black transition-all">
+        ✕
+      </button>
+      
+      <div class="inline-flex items-center gap-2 px-3 py-1 bg-red-50 text-red-700 rounded-full text-xs font-black uppercase tracking-wider mb-2">
+        <i data-lucide="qr-code" class="w-4 h-4"></i> Deli Burrito QR
+      </div>
+      
+      <h3 id="qrModalTitle" class="text-2xl font-black text-gray-800 uppercase tracking-tight">Mesa #1</h3>
+      <p class="text-xs text-gray-400 font-bold uppercase tracking-wider mt-1 mb-6">Escanea para iniciar el pedido colaborativo</p>
+
+      <div class="bg-white p-4 rounded-3xl border-2 border-dashed border-gray-200 inline-block shadow-inner mb-6">
+        <img id="qrModalImage" src="" alt="Código QR" class="w-56 h-56 mx-auto object-contain rounded-2xl" />
+      </div>
+
+      <div class="bg-gray-50 p-3 rounded-2xl border border-gray-100 mb-6 flex items-center gap-2">
+        <input type="text" id="qrModalUrlInput" readonly class="w-full bg-transparent text-xs text-gray-600 font-mono outline-none truncate" />
+        <button onclick="copyQrUrl()" class="px-3 py-1.5 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-xl font-black text-xs transition-all whitespace-nowrap">
+          Copiar
+        </button>
+      </div>
+
+      <div class="flex gap-3">
+        <button onclick="printQrCard()" class="flex-1 py-3.5 bg-yellow-400 hover:bg-yellow-300 text-red-950 font-black rounded-2xl shadow-md transition-all text-sm flex items-center justify-center gap-2">
+          <i data-lucide="printer" class="w-4 h-4"></i> Imprimir QR
+        </button>
+        <button onclick="closeQrModal()" class="px-5 py-3.5 bg-gray-100 hover:bg-gray-200 text-gray-600 font-black rounded-2xl transition-all text-sm">
+          Cerrar
+        </button>
+      </div>
     </div>
   </div>
 
@@ -362,7 +457,7 @@
     let currentView = 'orders';
     let currentOrderTab = 'pendiente';
     let currentDateFilter = 'today';
-    let dataCache = { orders: [], categories: [], options: [], variations: [], productTypes: [] };
+    let dataCache = { orders: [], categories: [], options: [], variations: [], productTypes: [], tables: [] };
     // Inicializar en el pasado para que el primer auto-refresh dispare de inmediato
     let lastUpdate = new Date(0);
     const money = (val) => new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(val);
@@ -614,26 +709,54 @@
         }, 3000);
     };
 
+    window.closeConfirmModal = () => {
+        const overlay = document.getElementById('confirmOverlay');
+        const yesBtn  = document.getElementById('confirmYes');
+        const noBtn   = document.getElementById('confirmCancel');
+        const titleEl = document.getElementById('confirmTitle');
+        const msgEl   = document.getElementById('confirmMessage');
+
+        if (overlay) overlay.classList.add('hidden');
+        if (yesBtn) {
+            yesBtn.onclick = null;
+            yesBtn.textContent = 'Sí, borrar';
+            yesBtn.className = 'flex-1 py-4 bg-red-600 text-white rounded-2xl font-black shadow-lg hover:bg-red-700 transition-all uppercase text-xs';
+        }
+        if (noBtn) {
+            noBtn.onclick = null;
+            noBtn.textContent = 'Mejor no';
+            noBtn.className = 'flex-1 py-4 bg-gray-100 text-gray-400 rounded-2xl font-black hover:bg-gray-200 transition-all uppercase text-xs';
+        }
+        if (titleEl) titleEl.textContent = '¿Estás seguro?';
+        if (msgEl)   msgEl.textContent   = 'Esta acción no se puede deshacer fácilmente.';
+    };
+
+    // Cerrar modal de confirmación con tecla Escape
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+            const confirmOverlay = document.getElementById('confirmOverlay');
+            if (confirmOverlay && !confirmOverlay.classList.contains('hidden')) {
+                window.closeConfirmModal();
+            }
+        }
+    });
+
     window.showConfirm = (message, onConfirm) => {
         const overlay = document.getElementById('confirmOverlay');
-        const msgEl = document.getElementById('confirmMessage');
-        const yesBtn = document.getElementById('confirmYes');
-        const noBtn = document.getElementById('confirmCancel');
+        const msgEl   = document.getElementById('confirmMessage');
+        const yesBtn  = document.getElementById('confirmYes');
+        const noBtn   = document.getElementById('confirmCancel');
 
         msgEl.textContent = message;
         overlay.classList.remove('hidden');
 
-        const cleanUp = () => {
-            overlay.classList.add('hidden');
-            yesBtn.onclick = null;
-            noBtn.onclick = null;
-        };
-
         yesBtn.onclick = () => {
             onConfirm();
-            cleanUp();
+            window.closeConfirmModal();
         };
-        noBtn.onclick = cleanUp;
+        noBtn.onclick = () => {
+            window.closeConfirmModal();
+        };
     };
 
     // Navigation
@@ -696,6 +819,7 @@
 
     const viewTitles = {
         orders:          'Pedidos',
+        tables:          'Control de Mesas',
         categories:      'Categorías',
         'product-types': 'Módulos de Comida',
         variations:      'Tipo de Producto',
@@ -758,6 +882,9 @@
             }
             renderOrders();
             setOrderTab(currentOrderTab); // Refresh tab style
+        } else if (currentView === 'tables') {
+            dataCache.tables = Array.isArray(data.tables) ? data.tables : (Array.isArray(data) ? data : []);
+            renderTables();
         } else if (currentView === 'product-types') {
             dataCache.productTypes = data;
             renderProductTypes();
@@ -1843,13 +1970,23 @@
                         const itemNumber = String(productCounts[productType]).padStart(2, '0');
                         const productLabel = `${productType} #${itemNumber}`;
                         
+                        // Extraer comensal individual si viene en notes
+                        let guestName = null;
+                        let cleanNotes = item.notes || '';
+                        const match = cleanNotes.match(/\[Comensal:\s*([^\]]+)\]/i);
+                        if (match) {
+                            guestName = match[1].trim();
+                            cleanNotes = cleanNotes.replace(match[0], '').trim();
+                        }
+
                         return `
                     <div class="bg-white rounded-2xl p-4 border-2 border-gray-100 shadow-sm hover:border-red-200 transition-colors">
                         <div class="flex justify-between items-center mb-3 border-b-2 border-dashed border-gray-100 pb-2">
-                            <div>
-                                <span class="inline-block bg-red-600 text-white px-2 py-1 rounded-lg text-xs font-black mr-2">${productLabel}</span>
-                                <span class="text-lg font-black text-gray-800 uppercase tracking-tight">${item.product_type}</span>
-                                ${item.variation_name ? `<span class="ml-2 px-2 py-0.5 bg-orange-100 text-orange-700 rounded-full text-[10px] font-black uppercase tracking-wide">${item.variation_name}</span>` : ''}
+                            <div class="flex flex-wrap items-center gap-1.5">
+                                <span class="inline-block bg-red-600 text-white px-2 py-1 rounded-lg text-xs font-black mr-1">${productLabel}</span>
+                                <span class="text-base font-black text-gray-800 uppercase tracking-tight">${item.product_type}</span>
+                                ${item.variation_name ? `<span class="px-2 py-0.5 bg-orange-100 text-orange-700 rounded-full text-[10px] font-black uppercase tracking-wide">${item.variation_name}</span>` : ''}
+                                ${guestName ? `<span class="px-2.5 py-0.5 bg-amber-100 text-amber-900 border border-amber-300 rounded-full text-xs font-black">👤 ${guestName}</span>` : ''}
                             </div>
                         </div>
                         <ul class="space-y-2">
@@ -1863,10 +2000,10 @@
                                 </li>
                             `).join('')}
                         </ul>
-                        ${item.notes ? `
+                        ${cleanNotes ? `
                             <div class="mt-3 p-3 bg-yellow-50 rounded-xl border border-yellow-100">
                                 <p class="text-[9px] font-black text-yellow-600 uppercase mb-0.5 tracking-widest">Notas Especiales</p>
-                                <p class="text-xs font-bold text-gray-800 italic leading-relaxed">"${item.notes}"</p>
+                                <p class="text-xs font-bold text-gray-800 italic leading-relaxed">"${cleanNotes}"</p>
                             </div>
                         ` : ''}
                     </div>
@@ -2052,18 +2189,7 @@
 
         overlay.classList.remove('hidden');
 
-        const cleanUp = () => {
-            overlay.classList.add('hidden');
-            yesBtn.onclick = null;
-            noBtn.onclick  = null;
-            // Restaurar estilos y textos por defecto del modal de confirmación genérico
-            yesBtn.textContent = 'Sí, borrar';
-            noBtn.textContent  = 'Mejor no';
-            yesBtn.className = 'flex-1 py-4 bg-red-600 text-white rounded-2xl font-black shadow-lg hover:bg-red-700 transition-all uppercase text-xs';
-            noBtn.className  = 'flex-1 py-4 bg-gray-100 text-gray-400 rounded-2xl font-black hover:bg-gray-200 transition-all uppercase text-xs';
-            titleEl.textContent = '¿Estás seguro?';
-            msgEl.textContent   = 'Esta acción no se puede deshacer fácilmente.';
-        };
+        const cleanUp = () => window.closeConfirmModal();
 
         // "Sí" → aceptar + WhatsApp + Imprimir comanda
         yesBtn.onclick = async () => {
@@ -2109,17 +2235,7 @@
 
         overlay.classList.remove('hidden');
 
-        const cleanUp = () => {
-            overlay.classList.add('hidden');
-            yesBtn.onclick = null;
-            noBtn.onclick  = null;
-            yesBtn.textContent = 'Sí, borrar';
-            noBtn.textContent  = 'Mejor no';
-            yesBtn.className = 'flex-1 py-4 bg-red-600 text-white rounded-2xl font-black shadow-lg hover:bg-red-700 transition-all uppercase text-xs';
-            noBtn.className  = 'flex-1 py-4 bg-gray-100 text-gray-400 rounded-2xl font-black hover:bg-gray-200 transition-all uppercase text-xs';
-            titleEl.textContent = '¿Estás seguro?';
-            msgEl.textContent   = 'Esta acción no se puede deshacer fácilmente.';
-        };
+        const cleanUp = () => window.closeConfirmModal();
 
         const cancelText = `Hola ${order.customer_name}, lamentamos informarte que tu pedido #${order.id} ha sido cancelado. Si tienes dudas, contáctanos. Deli Burrito.`;
 
@@ -2279,6 +2395,337 @@
             await loadStoreStatus(); // Recargar estado
         }
     });
+
+    // ── CONTROL DE MESAS (SALAS MULTIJUGADOR) ───────────────────────────
+
+    function renderTables() {
+        const tables = dataCache.tables || [];
+        const grid = document.getElementById('tablesGrid');
+        if (!grid) return;
+
+        // Actualizar estadísticas
+        const total = tables.length;
+        const free = tables.filter(t => t.status === 'free').length;
+        const occupied = tables.filter(t => t.status === 'occupied').length;
+
+        const elTotal = document.getElementById('tablesStatsTotal');
+        const elFree = document.getElementById('tablesStatsFree');
+        const elOccupied = document.getElementById('tablesStatsOccupied');
+        if (elTotal) elTotal.textContent = total;
+        if (elFree) elFree.textContent = free;
+        if (elOccupied) elOccupied.textContent = occupied;
+
+        if (tables.length === 0) {
+            grid.innerHTML = `
+                <div class="col-span-full py-16 text-center bg-white rounded-3xl border border-dashed border-gray-200 p-8">
+                    <div class="w-16 h-16 bg-amber-50 text-amber-500 rounded-2xl mx-auto flex items-center justify-center mb-4">
+                        <i data-lucide="qr-code" class="w-8 h-8"></i>
+                    </div>
+                    <h4 class="text-xl font-black text-gray-700 uppercase">No hay mesas registradas</h4>
+                    <p class="text-sm text-gray-400 mt-1 mb-6">Agrega mesas físicas para que los comensales puedan escanear su código QR y unirse a la sala colaborativa.</p>
+                    <button onclick="openCreateTableModal()" class="px-6 py-3 bg-red-600 text-white rounded-2xl font-black hover:bg-red-700 transition-all shadow-lg text-sm">
+                        + AGREGAR PRIMERA MESA
+                    </button>
+                </div>
+            `;
+            lucide.createIcons({ nodes: [grid] });
+            return;
+        }
+
+        grid.innerHTML = tables.map(table => {
+            const isFree = table.status === 'free';
+            const isOccupied = table.status === 'occupied';
+            const isLocked = table.status === 'locked';
+
+            let statusBadge = '';
+            let cardBg = '';
+            let cardBorder = '';
+
+            if (isFree) {
+                statusBadge = `
+                    <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black uppercase bg-emerald-100 text-emerald-800 border border-emerald-200">
+                        <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+                        Libre
+                    </span>
+                `;
+                cardBg = 'bg-white';
+                cardBorder = 'border-gray-100 hover:border-emerald-300';
+            } else if (isOccupied) {
+                statusBadge = `
+                    <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black uppercase bg-red-100 text-red-800 border border-red-200">
+                        <span class="w-2 h-2 rounded-full bg-red-500 animate-ping"></span>
+                        Ocupada
+                    </span>
+                `;
+                cardBg = 'bg-gradient-to-b from-amber-50/50 to-white';
+                cardBorder = 'border-amber-300 shadow-md shadow-amber-500/10';
+            } else {
+                statusBadge = `
+                    <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black uppercase bg-gray-100 text-gray-700 border border-gray-300">
+                        <span class="w-2 h-2 rounded-full bg-gray-400"></span>
+                        Bloqueada
+                    </span>
+                `;
+                cardBg = 'bg-gray-50';
+                cardBorder = 'border-gray-200 opacity-80';
+            }
+
+            const itemsCount = table.items_count || 0;
+            const cartTotal = table.cart_total ? money(table.cart_total) : '$0';
+            const tableJson = JSON.stringify(table).replace(/'/g, "&apos;");
+
+            return `
+                <div class="${cardBg} ${cardBorder} rounded-[2.5rem] border p-6 flex flex-col justify-between transition-all duration-300 hover:shadow-xl group relative">
+                    <div>
+                        <!-- Header de Mesa -->
+                        <div class="flex items-center justify-between mb-4">
+                            <div class="flex items-center gap-3">
+                                <div class="w-12 h-12 ${isOccupied ? 'bg-amber-500 text-white' : 'bg-red-50 text-red-700'} rounded-2xl flex items-center justify-center font-black text-lg shadow-sm">
+                                    #${table.number}
+                                </div>
+                                <div>
+                                    <h4 class="text-xl font-black text-gray-800 uppercase tracking-tight">Mesa ${table.number}</h4>
+                                    <p class="text-[10px] text-gray-400 font-mono">Hash: ${table.qr_hash ? table.qr_hash.substring(0, 8) + '...' : ''}</p>
+                                </div>
+                            </div>
+                            ${statusBadge}
+                        </div>
+
+                        <!-- Info de Carrito Colaborativo -->
+                        <div class="my-4 p-4 rounded-2xl ${isOccupied ? 'bg-amber-50 border border-amber-200/60' : 'bg-gray-50 border border-gray-100'}">
+                            <div class="flex items-center justify-between text-xs font-bold ${isOccupied ? 'text-amber-900' : 'text-gray-400'}">
+                                <span class="flex items-center gap-1.5">
+                                    <i data-lucide="shopping-bag" class="w-4 h-4"></i>
+                                    Carrito en vivo:
+                                </span>
+                                <span class="font-black text-sm ${isOccupied ? 'text-amber-800' : 'text-gray-500'}">
+                                    ${isOccupied ? `${itemsCount} ítem${itemsCount !== 1 ? 's' : ''}` : 'Sin pedidos'}
+                                </span>
+                            </div>
+                            ${isOccupied ? `
+                                <div class="mt-2 pt-2 border-t border-amber-200/60 flex items-center justify-between text-xs">
+                                    <span class="text-gray-500 font-bold">Total acumulado:</span>
+                                    <span class="font-black text-amber-900 text-sm">${cartTotal}</span>
+                                </div>
+                            ` : ''}
+                        </div>
+                    </div>
+
+                    <!-- Botones de Acción -->
+                    <div class="mt-4 pt-4 border-t border-gray-100 flex flex-col gap-2">
+                        <button onclick='openQrModal(${tableJson})' class="w-full py-3 bg-gray-100 hover:bg-gray-200 text-gray-800 rounded-xl font-black text-xs transition-all flex items-center justify-center gap-2">
+                            <i data-lucide="qr-code" class="w-4 h-4 text-amber-600"></i>
+                            VER CÓDIGO QR
+                        </button>
+
+                        ${isOccupied ? `
+                            <button onclick="forceReleaseTable(${table.id}, ${table.number})" class="w-full py-3 bg-red-600 hover:bg-red-700 text-white rounded-xl font-black text-xs transition-all shadow-md shadow-red-600/20 flex items-center justify-center gap-2 transform active:scale-95">
+                                <i data-lucide="zap" class="w-4 h-4 text-yellow-300"></i>
+                                FORZAR LIBERACIÓN
+                            </button>
+                        ` : `
+                            <button onclick="deleteTable(${table.id}, ${table.number})" class="w-full py-2.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-xl font-bold text-xs transition-all flex items-center justify-center gap-1.5">
+                                <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                                Eliminar Mesa
+                            </button>
+                        `}
+                    </div>
+                </div>
+            `;
+        }).join('');
+
+        lucide.createIcons({ nodes: [grid] });
+    }
+
+    function openCreateTableModal() {
+        const overlay = document.getElementById('modalOverlay');
+        const content = document.getElementById('modalContent');
+        content.className = "bg-white w-full max-w-md rounded-[2.5rem] shadow-2xl p-8 max-h-[95vh] custom-scrollbar text-center";
+
+        // Sugerir el siguiente número de mesa
+        const tables = dataCache.tables || [];
+        const nextNumber = tables.length > 0 ? Math.max(...tables.map(t => Number(t.number))) + 1 : 1;
+
+        content.innerHTML = `
+            <div class="w-14 h-14 bg-red-50 text-red-600 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                <i data-lucide="plus-circle" class="w-8 h-8"></i>
+            </div>
+            <h3 class="text-2xl font-black uppercase text-gray-800 mb-2">Nueva Mesa Física</h3>
+            <p class="text-xs text-gray-400 font-bold uppercase tracking-wider mb-6">Asigna el número visible en el local</p>
+            <form onsubmit="handleCreateTableSubmit(event)" class="space-y-6">
+                <div>
+                    <label class="block text-xs font-black text-gray-400 uppercase mb-2">Número de Mesa</label>
+                    <input type="number" id="newTableNumberInput" name="number" min="1" step="1" value="${nextNumber}" required class="w-full p-4 bg-gray-50 rounded-2xl border-2 border-transparent focus:border-red-600 outline-none transition-all font-black text-3xl text-center text-gray-800" placeholder="1" autofocus>
+                </div>
+                <div class="flex gap-3">
+                    <button type="button" onclick="closeModal()" class="flex-1 py-4 bg-gray-100 hover:bg-gray-200 text-gray-500 rounded-2xl font-black transition-all uppercase text-xs">Cancelar</button>
+                    <button type="submit" id="saveTableBtn" class="flex-1 py-4 bg-red-600 hover:bg-red-700 text-white rounded-2xl font-black shadow-lg transition-all uppercase text-xs">Crear Mesa</button>
+                </div>
+            </form>
+        `;
+        overlay.classList.remove('hidden');
+        lucide.createIcons({ nodes: [content] });
+    }
+
+    async function handleCreateTableSubmit(e) {
+        e.preventDefault();
+        const input = document.getElementById('newTableNumberInput');
+        const btn = document.getElementById('saveTableBtn');
+        const number = parseInt(input.value, 10);
+
+        if (!number || number <= 0) {
+            showToast('Ingresa un número de mesa válido', 'error');
+            return;
+        }
+
+        btn.disabled = true;
+        btn.textContent = 'CREANDO...';
+
+        try {
+            const resp = await fetch(`${apiBase}/admin-api.php?route=tables`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ number })
+            });
+            const result = await resp.json();
+
+            if (result.ok) {
+                showToast(result.message || `Mesa #${number} creada con éxito.`);
+                closeModal();
+                loadViewData();
+            } else {
+                showToast(result.message || 'Error al crear la mesa', 'error');
+            }
+        } catch (err) {
+            console.error(err);
+            showToast('Error de conexión al registrar mesa', 'error');
+        } finally {
+            btn.disabled = false;
+            btn.textContent = 'CREAR MESA';
+        }
+    }
+
+    function openQrModal(table) {
+        const overlay = document.getElementById('qrModalOverlay');
+        const titleEl = document.getElementById('qrModalTitle');
+        const imgEl = document.getElementById('qrModalImage');
+        const urlInput = document.getElementById('qrModalUrlInput');
+
+        const customerUrl = `${window.location.origin}/?mesa=${encodeURIComponent(table.qr_hash)}`;
+        const qrApiUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&margin=10&data=${encodeURIComponent(customerUrl)}`;
+
+        titleEl.textContent = `Mesa #${table.number}`;
+        imgEl.src = qrApiUrl;
+        urlInput.value = customerUrl;
+
+        overlay.classList.remove('hidden');
+        lucide.createIcons({ nodes: [overlay] });
+    }
+
+    function closeQrModal() {
+        document.getElementById('qrModalOverlay').classList.add('hidden');
+    }
+
+    function copyQrUrl() {
+        const urlInput = document.getElementById('qrModalUrlInput');
+        urlInput.select();
+        navigator.clipboard.writeText(urlInput.value)
+            .then(() => showToast('Enlace copiado al portapapeles'))
+            .catch(() => showToast('No se pudo copiar el enlace', 'error'));
+    }
+
+    function printQrCard() {
+        const qrImg = document.getElementById('qrModalImage').src;
+        const title = document.getElementById('qrModalTitle').textContent;
+        const printWin = window.open('', '_blank', 'width=600,height=720');
+        if (!printWin) {
+            showToast('Habilita las ventanas emergentes para imprimir', 'error');
+            return;
+        }
+        printWin.document.write(`
+            <!DOCTYPE html>
+            <html lang="es">
+            <head>
+                <meta charset="UTF-8" />
+                <title>QR ${title} - Deli Burrito</title>
+                <style>
+                    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; text-align: center; padding: 30px; margin: 0; background: #fafafa; }
+                    .card { border: 4px solid #991b1b; border-radius: 28px; padding: 35px 25px; max-width: 380px; margin: 0 auto; background: white; box-shadow: 0 4px 25px rgba(0,0,0,0.08); }
+                    h1 { color: #991b1b; font-size: 32px; margin: 0; text-transform: uppercase; font-weight: 900; letter-spacing: -1px; }
+                    .subtitle { color: #6b7280; font-size: 11px; text-transform: uppercase; font-weight: 800; letter-spacing: 2px; margin-top: 4px; }
+                    .mesa-badge { display: inline-block; background: #fef3c7; color: #92400e; padding: 6px 18px; border-radius: 999px; font-size: 20px; font-weight: 900; margin: 18px 0 14px 0; border: 1px solid #fde68a; }
+                    .qr-container { padding: 12px; border: 2px dashed #e5e7eb; border-radius: 24px; display: inline-block; margin-bottom: 18px; }
+                    img { width: 240px; height: 240px; display: block; border-radius: 12px; }
+                    p { color: #374151; font-size: 14px; font-weight: 600; line-height: 1.45; margin: 0; }
+                    .highlight { color: #991b1b; font-weight: 900; }
+                    .footer { margin-top: 24px; font-size: 10px; color: #9ca3af; text-transform: uppercase; letter-spacing: 1.5px; font-weight: 800; }
+                    @media print {
+                        body { background: white; padding: 0; }
+                        .card { box-shadow: none; border-width: 3px; }
+                    }
+                </style>
+            </head>
+            <body>
+                <div class="card">
+                    <h1>DELI BURRITO</h1>
+                    <div class="subtitle">Sala Multijugador</div>
+                    <div class="mesa-badge">${title}</div>
+                    <div class="qr-container">
+                        <img src="${qrImg}" alt="Código QR" />
+                    </div>
+                    <p>Escanea con tu cámara para <span class="highlight">ordenar y armar tu burrito</span> con tus amigos en esta mesa.</p>
+                    <div class="footer">¡Pide a tu gusto y comparte!</div>
+                </div>
+                <script>
+                    window.onload = function() { window.print(); };
+                <\/script>
+            </body>
+            </html>
+        `);
+        printWin.document.close();
+    }
+
+    function forceReleaseTable(tableId, tableNumber) {
+        showConfirm(`¿Forzar liberación de la Mesa #${tableNumber}? Esto cerrará la sala activa y eliminará todos los ítems del carrito colaborativo.`, async () => {
+            try {
+                const resp = await fetch(`${apiBase}/admin-api.php?route=tables/${tableId}/force-release`, {
+                    method: 'POST'
+                });
+                const result = await resp.json();
+
+                if (result.ok) {
+                    showToast(result.message || `Mesa #${tableNumber} liberada.`);
+                    loadViewData();
+                } else {
+                    showToast(result.message || 'Error al liberar la mesa', 'error');
+                }
+            } catch (err) {
+                console.error(err);
+                showToast('Error de conexión al liberar mesa', 'error');
+            }
+        });
+    }
+
+    function deleteTable(tableId, tableNumber) {
+        showConfirm(`¿Eliminar definitivamente la Mesa #${tableNumber}?`, async () => {
+            try {
+                const resp = await fetch(`${apiBase}/admin-api.php?route=tables/${tableId}`, {
+                    method: 'DELETE'
+                });
+                const result = await resp.json();
+
+                if (result.ok) {
+                    showToast(result.message || `Mesa #${tableNumber} eliminada.`);
+                    loadViewData();
+                } else {
+                    showToast(result.message || 'Error al eliminar mesa', 'error');
+                }
+            } catch (err) {
+                console.error(err);
+                showToast('Error de conexión al eliminar mesa', 'error');
+            }
+        });
+    }
 
     document.getElementById('refreshBtn').onclick = loadViewData;
     document.getElementById('logoutBtn').onclick = () => {

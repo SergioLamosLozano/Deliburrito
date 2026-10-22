@@ -27,8 +27,6 @@ backend/storage/framework/cache/data/
 backend/storage/framework/sessions/
 backend/storage/framework/views/
 backend/storage/logs/
-backend/public/assets/
-backend/public/index.html
 
 # Logs
 npm-debug.log*

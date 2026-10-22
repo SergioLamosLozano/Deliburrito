@@ -4,16 +4,52 @@ import { FaCheck } from 'react-icons/fa';
 import BurritoBuilder from './components/BurritoBuilder';
 import Checkout from './components/Checkout';
 import OrderSuccess from './components/OrderSuccess';
+import TableWelcomeModal from './components/TableWelcomeModal';
+import TableLobby from './components/TableLobby';
+import { useTableSession } from './hooks/useTableSession';
 
 export default function App(){
-  const [view, setView] = useState('builder'); // 'builder', 'checkout', 'success'
+  const [view, setView] = useState('builder'); // 'lobby', 'builder', 'checkout', 'success'
   const [cart, setCart] = useState([]);
   const [orderId, setOrderId] = useState(null);
   const [toasts, setToasts] = useState([]);
   const [categories, setCategories] = useState([]);
   const [showDuplicateModal, setShowDuplicateModal] = useState(false);
   const [itemToDuplicate, setItemToDuplicate] = useState(null);
+  const [editingItem, setEditingItem] = useState(null);
   const [storeOpen, setStoreOpen] = useState(true); // Estado del comercio
+
+  const showToast = (message, type = 'success') => {
+    const id = Date.now();
+    setToasts(prev => [...prev, { id, message, type }]);
+    setTimeout(() => {
+      setToasts(prev => prev.filter(t => t.id !== id));
+    }, 3000);
+  };
+
+  // Sesión de mesa colaborativa (QR escaneado)
+  const {
+    tableSession,
+    isTableModalOpen,
+    isJoining,
+    joinError,
+    currentHostName,
+    joinTable,
+    overrideTable,
+    leaveTable,
+  } = useTableSession(showToast, () => setCart([]));
+
+  // Redirigir al Lobby cuando se inicializa o activa una sesión de mesa
+  const prevSessionIdRef = React.useRef(null);
+  React.useEffect(() => {
+    const currentSessionId = tableSession?.session_id;
+    if (currentSessionId && prevSessionIdRef.current !== currentSessionId) {
+      setView('lobby');
+    } else if (!currentSessionId && prevSessionIdRef.current) {
+      setView('builder');
+    }
+    prevSessionIdRef.current = currentSessionId;
+  }, [tableSession?.session_id]);
 
   // MEDIA-04: inicializar la cookie CSRF de Laravel al montar la app
   React.useEffect(() => {
@@ -48,14 +84,6 @@ export default function App(){
 
     return () => clearInterval(interval);
   }, []);
-
-  const showToast = (message, type = 'success') => {
-    const id = Date.now();
-    setToasts(prev => [...prev, { id, message, type }]);
-    setTimeout(() => {
-      setToasts(prev => prev.filter(t => t.id !== id));
-    }, 3000);
-  };
 
   const handleCheckout = (items) => {
     setCart(items);
@@ -176,23 +204,69 @@ export default function App(){
   const handleReset = () => {
     setCart([]);
     setOrderId(null);
-    setView('builder');
+    if (tableSession) {
+      setView('lobby');
+    } else {
+      setView('builder');
+    }
   };
 
   return (
     <>
-      {view === 'builder' && <BurritoBuilder onCheckout={handleCheckout} initialCart={cart} showToast={showToast} />}
+      {view === 'lobby' && tableSession && (
+        <TableLobby
+          tableSession={tableSession}
+          onGoToBuilder={() => {
+            setEditingItem(null);
+            setView('builder');
+          }}
+          onEditItem={(item) => {
+            setEditingItem(item);
+            setView('builder');
+          }}
+          onSuccess={handleSuccess}
+          onLeaveTable={leaveTable}
+          showToast={showToast}
+        />
+      )}
+      {((view === 'builder') || (view === 'lobby' && !tableSession)) && (
+        <BurritoBuilder 
+          onCheckout={handleCheckout} 
+          initialCart={cart} 
+          showToast={showToast}
+          tableSession={tableSession}
+          onSuccess={handleSuccess}
+          onBackToLobby={() => {
+            setEditingItem(null);
+            setView('lobby');
+          }}
+          editingItem={editingItem}
+          onCancelEdit={() => setEditingItem(null)}
+        />
+      )}
       {view === 'checkout' && (
         <Checkout 
           cartItems={cart} 
-          onBack={() => setView('builder')} 
+          onBack={() => setView(tableSession ? 'lobby' : 'builder')} 
+          onBackToLobby={() => setView('lobby')}
           onSuccess={handleSuccess} 
           onRemoveItem={handleRemoveItem}
           onDuplicateItem={handleDuplicateItem}
           showToast={showToast}
+          tableSession={tableSession}
         />
       )}
       {view === 'success' && <OrderSuccess orderId={orderId} onReset={handleReset} />}
+
+      {/* Modal Bloqueante de Bienvenida a la Mesa al escanear QR (?mesa=HASH) */}
+      <TableWelcomeModal
+        isOpen={isTableModalOpen}
+        isJoining={isJoining}
+        error={joinError}
+        currentHostName={currentHostName}
+        onJoin={joinTable}
+        onOverride={overrideTable}
+      />
 
       {/* Modal de confirmación para duplicar */}
       {showDuplicateModal && (

@@ -61,6 +61,11 @@ erDiagram
     ORDERS ||--o{ ORDER_ITEMS : "contiene"
     ORDER_ITEMS ||--o{ ORDER_ITEM_OPTIONS : "personaliza"
     OPTIONS ||--o{ ORDER_ITEM_OPTIONS : "es elegida en"
+
+    TABLES ||--o{ TABLE_SESSIONS : "aloja"
+    TABLE_SESSIONS ||--o{ TABLE_SESSION_PARTICIPANTS : "reune"
+    TABLE_SESSIONS ||--o{ TABLE_CART_ITEMS : "acumula"
+    PRODUCT_TYPES ||--o{ TABLE_CART_ITEMS : "se agrega en"
 ```
 
 ### Detalle de Tablas y Columnas
@@ -154,6 +159,37 @@ Detalle de los ingredientes elegidos para ese ítem personalizado.
 *   `key` (VARCHAR, UNIQUE): Clave del ajuste (ej. `costo_domicilio`, `comercio_abierto`).
 *   `value` (LONGTEXT): Valor de configuración.
 *   `description` (VARCHAR): Notas del parámetro.
+
+#### 11. `tables` (Mesas Físicas)
+Control de mesas del restaurante para pedidos colaborativos vía QR.
+*   `id` (BIGINT UNSIGNED, PK)
+*   `number` (INT, UNIQUE): Número físico de la mesa visible en sala.
+*   `qr_hash` (VARCHAR, UNIQUE): Token criptográfico secreto (32 caracteres hexadecimales) que compone la URL de escaneo `?mesa=HASH`.
+*   `status` (ENUM: `'free'`, `'occupied'`, `'locked'`): Estado operativo de la mesa.
+
+#### 12. `table_sessions` (Sesiones Activas de Sala Colaborativa)
+Representa la sala multijugador iniciada por un comensal anfitrión (Host).
+*   `id` (BIGINT UNSIGNED, PK)
+*   `table_id` (BIGINT UNSIGNED, FK -> `tables.id`, CASCADE)
+*   `host_device_id` (VARCHAR): Huella digital del dispositivo del anfitrión para control de privilegios.
+*   `last_active_at` (TIMESTAMP): Registro de Heartbeat para expirar mesas inactivas.
+
+#### 13. `table_session_participants` (Participantes del Lobby 2D)
+Registra a cada comensal sentado a la mesa antes y durante el armado del pedido.
+*   `id` (BIGINT UNSIGNED, PK)
+*   `table_session_id` (BIGINT UNSIGNED, FK -> `table_sessions.id`, CASCADE)
+*   `guest_name` (VARCHAR): Nombre del comensal.
+*   `role` (ENUM: `'host'`, `'guest'`): Rol del participante (Host con corona y permisos de envío a cocina).
+*   `status` (ENUM: `'deciding'`, `'ready'`): Estado visual del comensal en la mesa 2D.
+
+#### 14. `table_cart_items` (Carrito Colaborativo en Memoria de BD)
+Acumula los platos armados por los diferentes comensales antes de consolidar el pedido final.
+*   `id` (BIGINT UNSIGNED, PK)
+*   `table_session_id` (BIGINT UNSIGNED, FK -> `table_sessions.id`, CASCADE)
+*   `guest_name` (VARCHAR): Nombre del comensal autor del plato (permite edición/eliminación restringida solo a su autor).
+*   `product_id` (BIGINT UNSIGNED, FK -> `product_types.id`)
+*   `details` (JSON): Configuración exacta del burrito/plato (variación, opciones, resumen).
+*   `price` (DECIMAL 10,2): Precio calculado del ítem.
 
 ---
 

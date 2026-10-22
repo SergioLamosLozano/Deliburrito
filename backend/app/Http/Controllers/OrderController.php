@@ -10,6 +10,8 @@ use App\Models\OrderItem;
 use App\Models\OrderItemOption;
 use App\Models\Option;
 use App\Models\Setting;
+use App\Models\Table;
+use App\Models\TableCartItem;
 
 class OrderController extends Controller
 {
@@ -22,12 +24,14 @@ class OrderController extends Controller
                 'customer_phone'   => 'required|string|max:50',
                 'customer_address' => 'nullable|string|max:1000',
                 'table_number'     => 'nullable|string|max:50',
+                'session_id'       => 'nullable|integer',
                 'delivery_type'    => 'required|in:domicilio,local,recoger',
                 'observations'     => 'nullable|string|max:1000',
                 'items'            => 'required|array|min:1|max:20',
                 'items.*.product_type' => 'required|string|max:100',
                 'items.*.variation_name' => 'nullable|string|max:255',
                 'items.*.notes'    => 'nullable|string|max:500',
+                'items.*.guest_name' => 'nullable|string|max:255',
                 'items.*.options'  => 'required|array',
                 'items.*.item_total' => 'required|numeric',
             ]);
@@ -57,12 +61,20 @@ class OrderController extends Controller
                     $itemTotal = (float)$itemPayload['item_total'];
                     $subtotal += $itemTotal;
 
+                    // Extraer el nombre del comensal individual
+                    $guestName = !empty($itemPayload['guest_name']) ? trim($itemPayload['guest_name']) : null;
+                    $itemNotes = isset($itemPayload['notes']) ? strip_tags(trim($itemPayload['notes'])) : null;
+
+                    if ($guestName && (! $itemNotes || ! str_contains($itemNotes, "[Comensal: {$guestName}]"))) {
+                        $itemNotes = "[Comensal: {$guestName}]" . ($itemNotes ? " " . $itemNotes : "");
+                    }
+
                     $orderItem = OrderItem::create([
                         'order_id'     => $order->id,
                         'product_type' => $itemPayload['product_type'],
                         'variation_name' => $itemPayload['variation_name'] ?? null,
                         'item_total'   => $itemTotal,
-                        'notes'        => isset($itemPayload['notes']) ? strip_tags(trim($itemPayload['notes'])) : null,
+                        'notes'        => $itemNotes,
                     ]);
 
                     foreach ($itemPayload['options'] as $optPayload) {
@@ -79,6 +91,16 @@ class OrderController extends Controller
                 $total = $subtotal + $delivery;
 
                 $order->update(['subtotal' => $subtotal, 'total' => $total, 'delivery_cost' => $delivery]);
+
+                // Vaciar el carrito colaborativo de la mesa para permitir nuevos pedidos posteriores
+                if (!empty($payload['session_id'])) {
+                    TableCartItem::where('table_session_id', $payload['session_id'])->delete();
+                }
+
+                // Mantener la mesa física en 'occupied' para que la sala continúe activa
+                if (!empty($payload['table_number'])) {
+                    Table::where('number', $payload['table_number'])->update(['status' => 'occupied']);
+                }
             });
 
             return response()->json(['ok' => true, 'order_id' => $order->id], 201);

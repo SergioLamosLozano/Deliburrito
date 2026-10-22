@@ -8,8 +8,16 @@ use Illuminate\Http\Request;
 
 class MenuController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
+        // Si el cliente entra escaneando QR con /menu?mesa=... o navegando directamente desde el navegador
+        if ($request->has('mesa') || ($request->header('Sec-Fetch-Dest') === 'document' && $request->acceptsHtml())) {
+            $indexPath = public_path('index.html');
+            if (file_exists($indexPath)) {
+                return response(file_get_contents($indexPath))->header('Content-Type', 'text/html; charset=UTF-8');
+            }
+        }
+
         $categories = Category::with(['variations', 'options' => function($query) {
             $query->where('is_active', true);
         }])

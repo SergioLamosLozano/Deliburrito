@@ -187,3 +187,113 @@ ON DUPLICATE KEY UPDATE `key` = `key`;
 - Iconos Lucide (admin) y react-icons (cliente) reemplazando todos los emojis
 - Colores contextuales en modales de confirmar/cancelar pedido
 - Icono WhatsApp real en todos los botones de mensajeria
+
+---
+
+## Actualización: Módulo Salas Multijugador y Carrito Colaborativo (Octubre 2026)
+
+### SQL a ejecutar en phpMyAdmin
+
+```sql
+-- 1. Tabla de Mesas Físicas con Hash Único Seguro para QR
+CREATE TABLE IF NOT EXISTS `tables` (
+    `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    `number` INT UNSIGNED NOT NULL,
+    `qr_hash` VARCHAR(64) NOT NULL,
+    `status` ENUM('free', 'occupied', 'locked') NOT NULL DEFAULT 'free',
+    `created_at` TIMESTAMP NULL DEFAULT NULL,
+    `updated_at` TIMESTAMP NULL DEFAULT NULL,
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `tables_number_unique` (`number`),
+    UNIQUE KEY `tables_qr_hash_unique` (`qr_hash`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 2. Tabla de Sesiones Activas de Mesa (Sala del Anfitrión)
+CREATE TABLE IF NOT EXISTS `table_sessions` (
+    `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    `table_id` BIGINT UNSIGNED NOT NULL,
+    `host_device_id` VARCHAR(255) NOT NULL,
+    `last_active_at` TIMESTAMP NULL DEFAULT NULL,
+    `created_at` TIMESTAMP NULL DEFAULT NULL,
+    `updated_at` TIMESTAMP NULL DEFAULT NULL,
+    PRIMARY KEY (`id`),
+    KEY `table_sessions_table_id_foreign` (`table_id`),
+    CONSTRAINT `fk_table_sessions_table` FOREIGN KEY (`table_id`) REFERENCES `tables` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 3. Tabla para el Lobby Multijugador (Participantes sentados a la mesa)
+CREATE TABLE IF NOT EXISTS `table_session_participants` (
+    `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    `table_session_id` BIGINT UNSIGNED NOT NULL,
+    `guest_name` VARCHAR(255) NOT NULL,
+    `role` ENUM('host', 'guest') NOT NULL DEFAULT 'guest',
+    `status` ENUM('deciding', 'ready') NOT NULL DEFAULT 'deciding',
+    `created_at` TIMESTAMP NULL DEFAULT NULL,
+    `updated_at` TIMESTAMP NULL DEFAULT NULL,
+    PRIMARY KEY (`id`),
+    KEY `table_session_participants_table_session_id_foreign` (`table_session_id`),
+    CONSTRAINT `fk_table_session_participants_session` 
+        FOREIGN KEY (`table_session_id`) REFERENCES `table_sessions` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 4. Tabla de Ítems del Carrito Colaborativo Temporal
+CREATE TABLE IF NOT EXISTS `table_cart_items` (
+    `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    `table_session_id` BIGINT UNSIGNED NOT NULL,
+    `guest_name` VARCHAR(255) NOT NULL,
+    `product_id` BIGINT UNSIGNED NOT NULL,
+    `details` JSON NOT NULL,
+    `price` DECIMAL(10, 2) NOT NULL DEFAULT 0.00,
+    `status` ENUM('building', 'ready') NOT NULL DEFAULT 'building',
+    `created_at` TIMESTAMP NULL DEFAULT NULL,
+    `updated_at` TIMESTAMP NULL DEFAULT NULL,
+    PRIMARY KEY (`id`),
+    KEY `table_cart_items_table_session_id_foreign` (`table_session_id`),
+    KEY `table_cart_items_product_id_foreign` (`product_id`),
+    CONSTRAINT `fk_table_cart_items_session` FOREIGN KEY (`table_session_id`) REFERENCES `table_sessions` (`id`) ON DELETE CASCADE,
+    CONSTRAINT `fk_table_cart_items_product` FOREIGN KEY (`product_id`) REFERENCES `product_types` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+```
+
+### Archivos a subir a cPanel
+
+#### A. Archivos en `public_html/` (Servidor Público / Web):
+| Archivo Local | Destino en cPanel | Descripción del Cambio |
+|---|---|---|
+| `backend/public/admin-api.php` | `public_html/admin-api.php` | Soporte de endpoints de mesas (GET/POST/DELETE mesas, leave, heartbeat, impresión con comensales, vaciado de carrito en checkout) |
+| `backend/public/admin/index.html` | `public_html/admin/index.html` | Gestión visual de mesas, modales de confirmación con botón 'X', generador de QR con modal de impresión |
+| `backend/public/index.html` | `public_html/index.html` | Punto de entrada del cliente compilado (apunta al nuevo hash de assets) |
+| `backend/public/assets/*` | `public_html/assets/` | Bundle compilado de React (incluye `TableLobby.jsx`, `TableCartModal.jsx`, `TableWelcomeModal.jsx`, `useTableSession.js`) |
+
+#### B. Archivos en `deliburrito_core/` (Núcleo Laravel):
+| Archivo Local | Destino en cPanel | Descripción del Cambio |
+|---|---|---|
+| `backend/app/Http/Controllers/OrderController.php` | `deliburrito_core/app/Http/Controllers/OrderController.php` | Vaciado de `table_cart_items` por `session_id`, mantenimiento de mesa en status `occupied` (no `locked`), y notas con `[Comensal: ...]`. |
+| `backend/app/Http/Controllers/TableClientController.php` | `deliburrito_core/app/Http/Controllers/TableClientController.php` | Endpoints `/tables/join`, `/tables/override`, `/tables/ping`, `/tables/{id}/lobby`, `/tables/leave`. |
+| `backend/app/Http/Controllers/TableCartController.php` | `deliburrito_core/app/Http/Controllers/TableCartController.php` | Endpoints del carrito colaborativo: agregar, listar, eliminar y editar con validación estricta de `guest_name`. |
+| `backend/app/Http/Controllers/MenuController.php` | `deliburrito_core/app/Http/Controllers/MenuController.php` | Soporte de URLs con parámetro `?mesa=...` sin romper respuestas JSON del menú. |
+| `backend/app/Models/Table.php` | `deliburrito_core/app/Models/Table.php` | Modelo Eloquent para mesas físicas con relación a sesiones. |
+| `backend/app/Models/TableSession.php` | `deliburrito_core/app/Models/TableSession.php` | Modelo Eloquent para sesiones activas y host device. |
+| `backend/app/Models/TableSessionParticipant.php` | `deliburrito_core/app/Models/TableSessionParticipant.php` | Modelo Eloquent para participantes del Lobby 2D. |
+| `backend/app/Models/TableCartItem.php` | `deliburrito_core/app/Models/TableCartItem.php` | Modelo Eloquent para ítems colaborativos. |
+| `backend/app/Console/Commands/CleanupIdleTables.php` | `deliburrito_core/app/Console/Commands/CleanupIdleTables.php` | Comando de limpieza automática de mesas inactivas (opcional vía cron job). |
+| `backend/routes/api.php` | `deliburrito_core/routes/api.php` | Registro de rutas API de mesas y carrito colaborativo. |
+| `backend/routes/web.php` | `deliburrito_core/routes/web.php` | Rutas web y throttling de pedidos. |
+| `backend/database/migrations/*` | `deliburrito_core/database/migrations/` | Nuevas migraciones de octubre 2026. |
+
+### Pasos de Despliegue en cPanel
+
+1. **Base de Datos**: Entra a phpMyAdmin en cPanel, selecciona `deliburrito_db` y ejecuta el bloque SQL indicado arriba.
+2. **Subir archivos de `public_html`**:
+   - Reemplaza `admin-api.php` e `index.html`.
+   - Reemplaza `admin/index.html`.
+   - En `public_html/assets/`, sube los nuevos archivos generados por `npm run build` y borra los `.js` y `.css` compilados anteriores para evitar servir versiones en caché.
+3. **Subir archivos de `deliburrito_core`**:
+   - Sube los nuevos controladores a `app/Http/Controllers/`.
+   - Sube los nuevos modelos a `app/Models/`.
+   - Sube las rutas actualizadas a `routes/api.php` y `routes/web.php`.
+4. **Verificación**:
+   - Abre `https://tu-dominio.com/admin/` con hard refresh (`Ctrl + F5` o `Ctrl + Shift + R`).
+   - Ve a la sección **Mesas** y verifica que aparezcan las mesas registradas o crea una mesa nueva.
+   - Da clic en **Ver Código QR**, copia el enlace o escanea el QR desde un dispositivo móvil para probar el Lobby Multijugador.
+

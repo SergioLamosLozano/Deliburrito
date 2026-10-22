@@ -32,6 +32,9 @@ Route::post('/orders', [App\Http\Controllers\OrderController::class, 'store'])
     ->name('orders.store')
     ->middleware('throttle:10,1');
 
+// Salas Multijugador (alias web opcional para frontend)
+Route::post('/tables/join', [App\Http\Controllers\TableClientController::class, 'join'])->name('tables.join.web');
+
 // ── URL del panel admin leída desde config/admin.php → .env ADMIN_PATH ───
 // Usar config() en lugar de env() garantiza que funcione con y sin caché de config
 $adminPath = config('admin.path', 'admin');

@@ -1,7 +1,18 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { IoCart, IoHome, IoSparkles } from 'react-icons/io5';
+import TableBadge from './TableBadge';
+import TableCartModal from './TableCartModal';
 
-export default function BurritoBuilder({ onCheckout, initialCart = [], showToast }) {
+export default function BurritoBuilder({ 
+  onCheckout, 
+  initialCart = [], 
+  showToast, 
+  tableSession, 
+  onSuccess, 
+  onBackToLobby,
+  editingItem = null,
+  onCancelEdit = null,
+}) {
   const [categories,  setCategories]  = useState([]);
   const [variations,  setVariations]  = useState([]);
   const [productTypes, setProductTypes] = useState([]);
@@ -12,6 +23,82 @@ export default function BurritoBuilder({ onCheckout, initialCart = [], showToast
   const [step,      setStep]      = useState(1);
   const [selection, setSelection] = useState({});
   const [cart,      setCart]      = useState(initialCart);
+
+  // Estados para sala de mesa colaborativa
+  const [tableCartCount, setTableCartCount] = useState(0);
+  const [isTableCartOpen, setIsTableCartOpen] = useState(false);
+  const [isAddingToTable, setIsAddingToTable] = useState(false);
+
+  // Consultar cantidad inicial de productos en la mesa al montar
+  useEffect(() => {
+    if (!tableSession?.session_id) return;
+    fetch(`/api/tables/cart/${tableSession.session_id}`, {
+      headers: { 'Accept': 'application/json' }
+    })
+      .then(r => r.json())
+      .then(d => {
+        if (d?.ok) setTableCartCount(d.total_items || 0);
+      })
+      .catch(() => {});
+  }, [tableSession?.session_id]);
+
+  // Sincronizar carrito local si initialCart cambia (ej. al vaciar carrito al unirse a una mesa)
+  useEffect(() => {
+    setCart(initialCart);
+  }, [initialCart]);
+
+  // Sincronizar estado cuando se recibe un ítem para editar
+  useEffect(() => {
+    if (!editingItem || categories.length === 0) return;
+
+    let details = editingItem.details;
+    if (typeof details === 'string') {
+      try { details = JSON.parse(details); } catch (e) { details = {}; }
+    }
+    details = details || {};
+
+    // 1. Tipo de producto
+    const pType = details.product_type || editingItem.product?.slug || 'burrito';
+    setProductType(pType);
+
+    // 2. Variación
+    if (details.variation_id && variations.length > 0) {
+      const foundVar = variations.find(v => Number(v.id) === Number(details.variation_id));
+      setSelectedVariation(foundVar || null);
+    } else {
+      setSelectedVariation(null);
+    }
+
+    // 3. Opciones seleccionadas
+    const newSel = {};
+    categories.forEach(cat => {
+      newSel[cat.id] = (cat.max_selections === 1 && cat.allow_quantity != 1) ? null : [];
+    });
+
+    if (details.options && Array.isArray(details.options)) {
+      details.options.forEach(opt => {
+        const foundOption = categories.flatMap(c => c.options ?? []).find(o => Number(o.id) === Number(opt.option_id));
+        if (foundOption) {
+          const catId = foundOption.category_id;
+          const cat = categories.find(c => Number(c.id) === Number(catId));
+          if (cat) {
+            if (cat.allow_quantity == 1) {
+              const currentArr = Array.isArray(newSel[catId]) ? newSel[catId] : [];
+              newSel[catId] = [...currentArr, { ...foundOption, quantity: opt.quantity || 1 }];
+            } else if (cat.max_selections === 1) {
+              newSel[catId] = foundOption;
+            } else {
+              const currentArr = Array.isArray(newSel[catId]) ? newSel[catId] : [];
+              newSel[catId] = [...currentArr, foundOption];
+            }
+          }
+        }
+      });
+    }
+
+    setSelection(newSel);
+    setStep(1);
+  }, [editingItem, categories, variations]);
 
   const productTypeData = useMemo(() => 
     productTypes.find(t => t.slug === productType),
@@ -186,7 +273,71 @@ export default function BurritoBuilder({ onCheckout, initialCart = [], showToast
 
     const varName = selectedVariation ? selectedVariation.name : '';
     const displayName = `${productTypeData?.emoji || '🍔'} ${productTypeData?.name} ${varName}`.trim();
+    const selectionSummary = options
+      .map(o => categories.flatMap(c => c.options ?? []).find(op => op.id === o.option_id)?.name ?? '')
+      .filter(Boolean).join(', ');
 
+    // 1. Si el usuario pertenece a una sala de mesa colaborativa (QR escaneado)
+    // Guardar en backend (POST /api/tables/cart/add o PUT /api/tables/cart/item/{id})
+    if (tableSession && tableSession.session_id) {
+      setIsAddingToTable(true);
+      const isEdit = Boolean(editingItem && editingItem.id);
+      const url = isEdit 
+        ? `/api/tables/cart/item/${editingItem.id}` 
+        : '/api/tables/cart/add';
+      const method = isEdit ? 'PUT' : 'POST';
+
+      fetch(url, {
+        method,
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        body: JSON.stringify({
+          session_id: tableSession.session_id,
+          product_id: productTypeData?.id || productType || 1,
+          details: {
+            product_type: productType,
+            variation_id: selectedVariation?.id ?? null,
+            variation_name: selectedVariation?.name ?? null,
+            options,
+            notes: '',
+            display_name: displayName,
+            selection_summary: selectionSummary,
+            item_total: currentTotal,
+          },
+          price: currentTotal,
+          guest_name: tableSession.guest_name,
+        }),
+      })
+      .then(async (res) => {
+        const data = await res.json().catch(() => null);
+        if (res.status === 403) {
+          throw new Error(data?.message || 'No puedes modificar los productos de otra persona');
+        }
+        if (!res.ok || !data?.ok) {
+          throw new Error(data?.message || (isEdit ? 'Error al actualizar en la mesa' : 'Error al guardar en la mesa'));
+        }
+        showToast(isEdit ? '¡Producto actualizado en la mesa!' : '¡Burrito agregado a la mesa!', 'success');
+        setTableCartCount(data.total_items ?? (tableCartCount + (isEdit ? 0 : 1)));
+        resetBuilder();
+        if (typeof onCancelEdit === 'function') {
+          onCancelEdit();
+        }
+        if (typeof onBackToLobby === 'function') {
+          onBackToLobby();
+        }
+      })
+      .catch((err) => {
+        showToast(err.message || 'No se pudo guardar en la mesa', 'error');
+      })
+      .finally(() => {
+        setIsAddingToTable(false);
+      });
+      return;
+    }
+
+    // Flujo normal sin mesa
     setCart(prev => [...prev, {
       id: Date.now(),
       product_type: productType,
@@ -196,15 +347,21 @@ export default function BurritoBuilder({ onCheckout, initialCart = [], showToast
       notes: '',
       item_total: currentTotal,
       display_name: displayName,
-      selection_summary: options
-        .map(o => categories.flatMap(c => c.options ?? []).find(op => op.id === o.option_id)?.name ?? '')
-        .filter(Boolean).join(', '),
+      selection_summary: selectionSummary,
     }]);
     resetBuilder();
     showToast('¡Agregado al carrito!', 'success');
   };
 
   const goToCheckout = () => {
+    if (tableSession && tableSession.session_id) {
+      if (typeof onBackToLobby === 'function') {
+        onBackToLobby();
+        return;
+      }
+      setIsTableCartOpen(true);
+      return;
+    }
     if (cart.length === 0) return showToast('Tu carrito está vacío', 'error');
     onCheckout(cart);
   };
@@ -264,15 +421,63 @@ export default function BurritoBuilder({ onCheckout, initialCart = [], showToast
           <button onClick={goToCheckout}
             className="relative bg-yellow-400 text-red-700 px-5 py-2.5 rounded-2xl font-black flex items-center gap-2 hover:bg-yellow-300 transform active:scale-95 transition-all shadow-lg">
             <IoCart className="w-5 h-5" />
-            {cart.length > 0 && (
-              <span className="absolute -top-2 -right-2 bg-white text-red-600 w-6 h-6 rounded-full flex items-center justify-center text-xs shadow-md border-2 border-red-600">
-                {cart.length}
+            {(tableSession ? tableCartCount > 0 : cart.length > 0) && (
+              <span className="absolute -top-2 -right-2 bg-white text-red-600 w-6 h-6 rounded-full flex items-center justify-center text-xs shadow-md border-2 border-red-600 font-black">
+                {tableSession ? tableCartCount : cart.length}
               </span>
             )}
             <span className="hidden sm:inline">VER CARRITO</span>
           </button>
         </div>
       </header>
+
+      {/* Badge de Mesa - Centrado horizontalmente con botón de volver al lobby */}
+      {tableSession && (
+        <div className="relative z-20 flex flex-wrap items-center justify-center gap-3 mt-4 px-4 animate-in fade-in slide-in-from-top-2 duration-300">
+          <TableBadge session={tableSession} />
+          {typeof onBackToLobby === 'function' && (
+            <button
+              type="button"
+              onClick={() => {
+                if (editingItem && typeof onCancelEdit === 'function') onCancelEdit();
+                onBackToLobby();
+              }}
+              className="px-4 py-2 bg-white text-gray-800 hover:text-red-600 rounded-full font-black text-xs shadow-md border-2 border-yellow-400 hover:border-red-500 transition-all flex items-center gap-1.5 active:scale-95"
+            >
+              <span>←</span>
+              <span>Volver a la Mesa #{tableSession.table_number || tableSession.table_id}</span>
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* Banner de Modo Edición */}
+      {editingItem && (
+        <div className="relative z-20 max-w-2xl mx-auto mt-3 px-4 animate-in fade-in slide-in-from-top-2 duration-300">
+          <div className="bg-gradient-to-r from-amber-500 to-yellow-500 text-white px-5 py-3 rounded-2xl shadow-lg flex items-center justify-between border-2 border-yellow-300">
+            <div className="flex items-center gap-2.5">
+              <span className="text-xl">✏️</span>
+              <div>
+                <p className="text-xs font-black uppercase tracking-wider">Modo Edición Activado</p>
+                <p className="text-xs font-bold opacity-95">
+                  Modificando: {editingItem.details?.display_name || editingItem.product?.name || 'Burrito'}
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                resetBuilder();
+                if (typeof onCancelEdit === 'function') onCancelEdit();
+                if (typeof onBackToLobby === 'function') onBackToLobby();
+              }}
+              className="px-3.5 py-1.5 bg-white text-amber-900 hover:bg-amber-50 rounded-xl text-xs font-black transition-all shadow-sm active:scale-95 cursor-pointer"
+            >
+              Cancelar Edición
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* ── PANTALLA 1: Elegir tipo ──────────────────────────────────────── */}
       {showTypeSelector && (
@@ -567,17 +772,23 @@ export default function BurritoBuilder({ onCheckout, initialCart = [], showToast
 
                 <button 
                   onClick={addToCart}
-                  disabled={step < filteredCategories.length || !isStepValid()}
+                  disabled={step < filteredCategories.length || !isStepValid() || isAddingToTable}
                   className={`w-full py-4 rounded-3xl font-black text-lg shadow-xl transition-all ${
-                    step === filteredCategories.length && isStepValid()
+                    step === filteredCategories.length && isStepValid() && !isAddingToTable
                       ? 'bg-yellow-400 text-red-900 hover:bg-yellow-300 active:scale-95 cursor-pointer'
                       : 'bg-gray-300 text-gray-500 cursor-not-allowed opacity-60'
                   }`}
                 >
-                  {step < filteredCategories.length 
+                  {isAddingToTable ? (
+                    editingItem ? 'ACTUALIZANDO EN LA MESA...' : 'GUARDANDO EN LA MESA...'
+                  ) : step < filteredCategories.length 
                     ? `COMPLETA PASO ${step}/${filteredCategories.length}` 
                     : !isStepValid()
                     ? 'SELECCIONA UNA OPCIÓN'
+                    : editingItem
+                    ? 'GUARDAR CAMBIOS EN LA MESA'
+                    : tableSession
+                    ? 'AGREGAR A LA MESA'
                     : 'AGREGAR A LA ORDEN'}
                 </button>
                 
@@ -590,6 +801,23 @@ export default function BurritoBuilder({ onCheckout, initialCart = [], showToast
             </div>
           </div>
         </main>
+      )}
+
+      {/* Modal de Carrito Colaborativo de Mesa */}
+      {tableSession && (
+        <TableCartModal
+          isOpen={isTableCartOpen}
+          onClose={() => setIsTableCartOpen(false)}
+          tableSession={tableSession}
+          onSuccess={onSuccess}
+          onBackToLobby={onBackToLobby}
+          showToast={showToast}
+          onItemCountChange={(count) => setTableCartCount(count)}
+          onEditItem={(item) => {
+            setIsTableCartOpen(false);
+            // Si el builder tiene callback externo onEditItem, lo llama; o si no, no hace falta
+          }}
+        />
       )}
 
       <style>{`

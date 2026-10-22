@@ -78,8 +78,8 @@ function requireAdmin(): void {
 
 // Routes
 try {
-    if ($method === 'GET' && ($path === '/' || $path === '')) {
-        header('Content-Type: text/html');
+    if ($method === 'GET' && ($path === '/' || $path === '' || isset($_GET['mesa']))) {
+        header('Content-Type: text/html; charset=UTF-8');
         readfile(__DIR__ . '/index.html');
         exit;
     }
@@ -177,6 +177,27 @@ try {
         requireAdmin();
         if ($method === 'POST' || $method === 'PUT') handleUpdateProductType($db, $matches[1]);
         elseif ($method === 'DELETE') handleDeleteProductType($db, $matches[1]);
+    } elseif ($path === '/api/tables/join' || $path === '/tables/join') {
+        if ($method === 'POST') handleClientJoinTable($db);
+    } elseif ($path === '/api/tables/override' || $path === '/tables/override') {
+        if ($method === 'POST') handleClientOverrideTable($db);
+    } elseif (preg_match('/^\/(?:api\/)?tables\/(\d+)\/lobby$/', $path, $matches)) {
+        if ($method === 'GET') handleClientLobbyTable($db, (int)$matches[1]);
+    } elseif (preg_match('/^\/(?:api\/)?tables\/cart\/item\/(\d+)$/', $path, $matches)) {
+        if ($method === 'DELETE') handleClientCartDeleteItem($db, (int)$matches[1]);
+        elseif ($method === 'PUT' || $method === 'POST') handleClientCartUpdateItem($db, (int)$matches[1]);
+    } elseif ($path === '/api/tables/ping' || $path === '/tables/ping') {
+        if ($method === 'POST') handleClientPingTable($db);
+    } elseif ($path === '/tables') {
+        requireAdmin();
+        if ($method === 'GET') handleListTables($db);
+        elseif ($method === 'POST') handleCreateTable($db);
+    } elseif (preg_match('/^\/tables\/(\d+)\/force-release$/', $path, $matches)) {
+        requireAdmin();
+        if ($method === 'POST') handleForceReleaseTable($db, (int)$matches[1]);
+    } elseif (preg_match('/^\/tables\/(\d+)$/', $path, $matches)) {
+        requireAdmin();
+        if ($method === 'DELETE') handleDeleteTable($db, (int)$matches[1]);
     } elseif ($path === '/reports') {
         requireAdmin();
         handleReports($db);
@@ -551,11 +572,24 @@ function handleCreateOrder($db) {
     $stmt->execute();
     $order_id = $stmt->insert_id;
 
+    if (!empty($table_number)) {
+        $db->query("UPDATE tables SET status = 'occupied' WHERE number = " . (int)$table_number);
+    }
+    $session_id = $data['session_id'] ?? null;
+    if (!empty($session_id)) {
+        $db->query("DELETE FROM table_cart_items WHERE table_session_id = " . (int)$session_id);
+    }
+
     foreach ($items as $item) {
         $product_type   = $item['product_type'] ?? 'burrito';
         $variation_name = $item['variation_name'] ?? null;
         $item_total     = (float)($item['item_total'] ?? 0);
         $notes          = $item['notes'] ?? '';
+        $guest_name     = $item['guest_name'] ?? null;
+
+        if ($guest_name && (! $notes || strpos($notes, "[Comensal: $guest_name]") === false)) {
+            $notes = "[Comensal: $guest_name]" . ($notes ? " " . $notes : "");
+        }
 
         $stmt2 = $db->prepare("INSERT INTO order_items (order_id, product_type, variation_name, item_total, notes) VALUES (?, ?, ?, ?, ?)");
         $stmt2->bind_param('issds', $order_id, $product_type, $variation_name, $item_total, $notes);
@@ -621,7 +655,7 @@ function handlePendientizeOrder($db, $id) {
 function handlePrintOrder($db, $id) {
     header('Content-Type: text/html; charset=utf-8');
     $order = $db->query("SELECT * FROM orders WHERE id = $id")->fetch_assoc();
-    $itemsResult = $db->query("SELECT oi.id, oi.product_type, oi.variation_name, oi.item_total FROM order_items oi WHERE oi.order_id = $id");
+    $itemsResult = $db->query("SELECT oi.id, oi.product_type, oi.variation_name, oi.item_total, oi.notes FROM order_items oi WHERE oi.order_id = $id");
     $items = [];
     while ($item = $itemsResult->fetch_assoc()) {
         $optsResult = $db->query("SELECT opt.id, opt.name, opt.category_id, oio.quantity FROM order_item_options oio JOIN options opt ON oio.option_id = opt.id WHERE oio.order_item_id = " . (int)$item['id']);
@@ -819,16 +853,36 @@ function handlePrintOrder($db, $id) {
         }
         $productCounts[$productName]++;
         $itemNumber = str_pad($productCounts[$productName], 2, '0', STR_PAD_LEFT);
-        $productLabel = "{$productName} #{$itemNumber} — {$customerName}";
         
+        // Extraer comensal individual si viene en las notas
+        $guestName = null;
+        $cleanNotes = $item['notes'] ?? '';
+        if (!empty($item['notes']) && preg_match('/\[Comensal:\s*([^\]]+)\]/i', $item['notes'], $m)) {
+            $guestName = trim($m[1]);
+            $cleanNotes = trim(str_replace($m[0], '', $item['notes']));
+        }
+
         $variationLabel = !empty($item['variation_name'])
-            ? ' — ' . strtoupper($item['variation_name'])
+            ? ' ' . strtoupper($item['variation_name'])
             : '';
+        $guestTitleLabel = $guestName ? " - [{$guestName}]" : "";
+        $productTitle = "{$productName}{$variationLabel}{$guestTitleLabel}";
+
         echo "
                 <div class='no-cortar mb-2'>
-                    <div style='background:#000;color:#fff;font-weight:900;font-size:17px;padding:3px 6px;text-transform:uppercase;letter-spacing:0.05em;'>
-                        {$productLabel}{$variationLabel}
-                    </div>
+                    <div style='background:#000;color:#fff;font-weight:900;font-size:16px;padding:3px 6px;text-transform:uppercase;letter-spacing:0.03em;display:flex;justify-content:space-between;align-items:center;'>
+                        <span>{$productTitle}</span>
+                        <span>#{$itemNumber}</span>
+                    </div>";
+
+        if ($guestName) {
+            echo "
+                    <div style='font-size:14px;font-weight:900;color:#000;padding:2px 6px;background:#fef3c7;border-left:4px solid #f59e0b;margin-top:2px;'>
+                        👤 COMENSAL: <span style='text-transform:uppercase;'>{$guestName}</span>
+                    </div>";
+        }
+
+        echo "
                     <ul style='margin-top:3px;font-size:17px;font-weight:700;padding-left:8px;line-height:1.5;'>
         ";
         foreach ($item['options'] as $opt) {
@@ -838,7 +892,16 @@ function handlePrintOrder($db, $id) {
             ";
         }
         echo "
-                    </ul>
+                    </ul>";
+
+        if (!empty($cleanNotes)) {
+            echo "
+                    <div style='margin-top:2px;font-size:13px;font-style:italic;color:#444;padding-left:8px;'>
+                        Nota: {$cleanNotes}
+                    </div>";
+        }
+
+        echo "
                 </div>
         ";
     }
@@ -1125,3 +1188,724 @@ function handleLoyaltyNotify($db) {
         'current_cycle_orders' => 0,
     ]);
 }
+
+// --- TABLES (SALAS MULTIJUGADOR) HANDLERS ---
+
+function handleListTables($db) {
+    // ── Limpieza on-the-fly (al vuelo) de sesiones inactivas por más de 2 minutos ──
+    try {
+        $cutoff = date('Y-m-d H:i:s', strtotime('-2 minutes'));
+        $stmtIdle = $db->prepare("
+            SELECT ts.id, ts.table_id 
+            FROM table_sessions ts
+            WHERE (ts.last_active_at IS NOT NULL AND ts.last_active_at < ?)
+               OR (ts.last_active_at IS NULL AND ts.created_at < ?)
+        ");
+        $stmtIdle->bind_param('ss', $cutoff, $cutoff);
+        $stmtIdle->execute();
+        $idleSessions = $stmtIdle->get_result()->fetch_all(MYSQLI_ASSOC);
+
+        if (!empty($idleSessions)) {
+            $sessionIds = array_column($idleSessions, 'id');
+            $tableIds = array_unique(array_column($idleSessions, 'table_id'));
+
+            $inSessions = implode(',', array_map('intval', $sessionIds));
+            $inTables = implode(',', array_map('intval', $tableIds));
+
+            $db->begin_transaction();
+            // 1. Eliminar ítems de carrito de las sesiones inactivas
+            $db->query("DELETE FROM table_cart_items WHERE table_session_id IN ($inSessions)");
+            // 2. Eliminar las sesiones inactivas
+            $db->query("DELETE FROM table_sessions WHERE id IN ($inSessions)");
+            // 3. Regresar mesas a 'free' sólo si no tienen otra sesión activa
+            $db->query("
+                UPDATE tables t 
+                SET t.status = 'free', t.updated_at = NOW() 
+                WHERE t.id IN ($inTables) 
+                  AND NOT EXISTS (SELECT 1 FROM table_sessions s WHERE s.table_id = t.id)
+            ");
+            $db->commit();
+        }
+    } catch (Throwable $e) {
+        if ($db->errno) {
+            @$db->rollback();
+        }
+    }
+
+    $sql = "
+        SELECT 
+            t.id,
+            t.number,
+            t.qr_hash,
+            t.status,
+            t.created_at,
+            t.updated_at,
+            s.id AS active_session_id,
+            s.host_device_id,
+            s.created_at AS session_started_at,
+            CASE 
+                WHEN t.status = 'occupied' THEN COALESCE(ci.items_count, 0)
+                ELSE 0
+            END AS items_count,
+            CASE 
+                WHEN t.status = 'occupied' THEN COALESCE(ci.cart_total, 0.00)
+                ELSE 0.00
+            END AS cart_total
+        FROM tables t
+        LEFT JOIN (
+            SELECT ts.*
+            FROM table_sessions ts
+            INNER JOIN (
+                SELECT table_id, MAX(id) AS max_id
+                FROM table_sessions
+                GROUP BY table_id
+            ) latest ON ts.id = latest.max_id
+        ) s ON s.table_id = t.id
+        LEFT JOIN (
+            SELECT table_session_id, COUNT(*) AS items_count, SUM(price) AS cart_total
+            FROM table_cart_items
+            GROUP BY table_session_id
+        ) ci ON ci.table_session_id = s.id
+        ORDER BY t.number ASC
+    ";
+
+    $result = $db->query($sql);
+    if (!$result) {
+        http_response_code(500);
+        echo json_encode(['ok' => false, 'error' => $db->error]);
+        return;
+    }
+
+    $tables = $result->fetch_all(MYSQLI_ASSOC);
+
+    foreach ($tables as &$t) {
+        $t['id'] = (int)$t['id'];
+        $t['number'] = (int)$t['number'];
+        $isOccupied = ($t['status'] === 'occupied');
+        $t['items_count'] = $isOccupied ? (int)$t['items_count'] : 0;
+        $t['cart_total'] = $isOccupied ? (float)$t['cart_total'] : 0.0;
+        $t['active_session_id'] = ($isOccupied && !empty($t['active_session_id'])) ? (int)$t['active_session_id'] : null;
+        if (!$isOccupied) {
+            $t['host_device_id'] = null;
+            $t['session_started_at'] = null;
+        }
+    }
+
+    echo json_encode(['ok' => true, 'tables' => $tables]);
+}
+
+function handleCreateTable($db) {
+    $input = json_decode(file_get_contents('php://input'), true);
+    if (!is_array($input)) {
+        $input = $_POST;
+    }
+
+    $number = isset($input['number']) ? (int)$input['number'] : 0;
+
+    if ($number <= 0) {
+        http_response_code(422);
+        echo json_encode(['ok' => false, 'message' => 'El número de mesa debe ser un entero positivo.']);
+        return;
+    }
+
+    // Verificar si el número de mesa ya está registrado
+    $stmtCheck = $db->prepare("SELECT id FROM tables WHERE number = ? LIMIT 1");
+    $stmtCheck->bind_param('i', $number);
+    $stmtCheck->execute();
+    if ($stmtCheck->get_result()->fetch_assoc()) {
+        http_response_code(409);
+        echo json_encode(['ok' => false, 'message' => "La mesa #{$number} ya existe."]);
+        return;
+    }
+
+    // Generar un hash único y seguro para el código QR
+    do {
+        $qr_hash = bin2hex(random_bytes(16)); // 32 caracteres hexadecimales únicos
+        $stmtHash = $db->prepare("SELECT id FROM tables WHERE qr_hash = ? LIMIT 1");
+        $stmtHash->bind_param('s', $qr_hash);
+        $stmtHash->execute();
+        $hashExists = $stmtHash->get_result()->fetch_assoc();
+    } while ($hashExists);
+
+    $stmtInsert = $db->prepare("INSERT INTO tables (number, qr_hash, status, created_at, updated_at) VALUES (?, ?, 'free', NOW(), NOW())");
+    $stmtInsert->bind_param('is', $number, $qr_hash);
+
+    if (!$stmtInsert->execute()) {
+        http_response_code(500);
+        echo json_encode(['ok' => false, 'message' => 'Error al registrar la mesa: ' . $db->error]);
+        return;
+    }
+
+    $newId = (int)$stmtInsert->insert_id;
+
+    http_response_code(201);
+    echo json_encode([
+        'ok' => true,
+        'message' => "Mesa #{$number} registrada exitosamente.",
+        'table' => [
+            'id' => $newId,
+            'number' => $number,
+            'qr_hash' => $qr_hash,
+            'status' => 'free',
+            'items_count' => 0,
+            'cart_total' => 0.0
+        ]
+    ]);
+}
+
+function handleForceReleaseTable($db, $id) {
+    $id = (int)$id;
+
+    $stmt = $db->prepare("SELECT id, number, status FROM tables WHERE id = ? LIMIT 1");
+    $stmt->bind_param('i', $id);
+    $stmt->execute();
+    $table = $stmt->get_result()->fetch_assoc();
+
+    if (!$table) {
+        http_response_code(404);
+        echo json_encode(['ok' => false, 'message' => 'Mesa no encontrada.']);
+        return;
+    }
+
+    $db->begin_transaction();
+
+    try {
+        // 1. Obtener IDs de las sesiones de esta mesa para limpieza garantizada
+        $stmtSessions = $db->prepare("SELECT id FROM table_sessions WHERE table_id = ?");
+        $stmtSessions->bind_param('i', $id);
+        $stmtSessions->execute();
+        $sessions = $stmtSessions->get_result()->fetch_all(MYSQLI_ASSOC);
+        $sessionIds = array_column($sessions, 'id');
+
+        if (!empty($sessionIds)) {
+            $inClause = implode(',', array_map('intval', $sessionIds));
+            // Eliminar items de carrito asociados
+            $db->query("DELETE FROM table_cart_items WHERE table_session_id IN ($inClause)");
+            // Eliminar sesiones
+            $stmtDel = $db->prepare("DELETE FROM table_sessions WHERE table_id = ?");
+            $stmtDel->bind_param('i', $id);
+            $stmtDel->execute();
+        }
+
+        // 2. Regresar el estado de la mesa a 'free'
+        $stmtUpdate = $db->prepare("UPDATE tables SET status = 'free', updated_at = NOW() WHERE id = ?");
+        $stmtUpdate->bind_param('i', $id);
+        $stmtUpdate->execute();
+
+        $db->commit();
+
+        echo json_encode([
+            'ok' => true,
+            'message' => "Mesa #{$table['number']} liberada forzosamente. Sesión y carrito eliminados.",
+            'table' => [
+                'id' => (int)$table['id'],
+                'number' => (int)$table['number'],
+                'status' => 'free',
+                'items_count' => 0,
+                'cart_total' => 0.0
+            ]
+        ]);
+    } catch (Throwable $e) {
+        $db->rollback();
+        http_response_code(500);
+        echo json_encode([
+            'ok' => false,
+            'message' => 'Error al liberar la mesa: ' . $e->getMessage()
+        ]);
+    }
+}
+
+function handleDeleteTable($db, $id) {
+    $id = (int)$id;
+
+    $stmtCheck = $db->prepare("SELECT id, number FROM tables WHERE id = ? LIMIT 1");
+    $stmtCheck->bind_param('i', $id);
+    $stmtCheck->execute();
+    $table = $stmtCheck->get_result()->fetch_assoc();
+
+    if (!$table) {
+        http_response_code(404);
+        echo json_encode(['ok' => false, 'message' => 'Mesa no encontrada.']);
+        return;
+    }
+
+    $stmt = $db->prepare("DELETE FROM tables WHERE id = ?");
+    $stmt->bind_param('i', $id);
+    $stmt->execute();
+
+    echo json_encode([
+        'ok' => true,
+        'message' => "Mesa #{$table['number']} eliminada correctamente."
+    ]);
+}
+
+function handleClientJoinTable($db) {
+    $input = json_decode(file_get_contents('php://input'), true);
+    if (!is_array($input)) {
+        $input = $_POST;
+    }
+
+    $qrHash = trim($input['qr_hash'] ?? '');
+    $guestName = trim($input['guest_name'] ?? '');
+
+    if (empty($qrHash)) {
+        http_response_code(422);
+        echo json_encode(['ok' => false, 'message' => 'qr_hash es requerido.']);
+        return;
+    }
+
+    // 1. Buscar la mesa por qr_hash
+    $stmt = $db->prepare("SELECT id, number, qr_hash, status FROM tables WHERE qr_hash = ? LIMIT 1");
+    $stmt->bind_param('s', $qrHash);
+    $stmt->execute();
+    $table = $stmt->get_result()->fetch_assoc();
+
+    if (!$table) {
+        http_response_code(404);
+        echo json_encode(['ok' => false, 'message' => 'Mesa no encontrada. Verifica el código QR escaneado.']);
+        return;
+    }
+
+    // 2. Si la mesa está bloqueada
+    if ($table['status'] === 'locked') {
+        http_response_code(403);
+        echo json_encode(['ok' => false, 'message' => 'La mesa ya cerró su pedido y se encuentra en preparación.']);
+        return;
+    }
+
+    // Si no se proporcionó guest_name, devolver estado de la mesa sin iniciar sesión
+    if (empty($guestName)) {
+        $tableId = (int)$table['id'];
+        $stmtSess = $db->prepare("SELECT host_name FROM table_sessions WHERE table_id = ? ORDER BY id DESC LIMIT 1");
+        $stmtSess->bind_param('i', $tableId);
+        $stmtSess->execute();
+        $sessRow = $stmtSess->get_result()->fetch_assoc();
+
+        echo json_encode([
+            'ok'           => true,
+            'table_id'     => $tableId,
+            'table_number' => (int)$table['number'],
+            'status'       => $table['status'],
+            'host_name'    => $sessRow['host_name'] ?? 'el Anfitrión',
+        ]);
+        return;
+    }
+
+    // 3. Si la mesa está libre -> Anfitrión (host)
+    if ($table['status'] === 'free') {
+        $hostDeviceId = sprintf(
+            '%04x%04x-%04x-%04x-%04x-%04x%04x%04x',
+            mt_rand(0, 0xffff), mt_rand(0, 0xffff),
+            mt_rand(0, 0xffff),
+            mt_rand(0, 0x0fff) | 0x4000,
+            mt_rand(0, 0x3fff) | 0x8000,
+            mt_rand(0, 0xffff), mt_rand(0, 0xffff), mt_rand(0, 0xffff)
+        );
+
+        $tableId = (int)$table['id'];
+        $db->begin_transaction();
+        try {
+            $db->query("UPDATE tables SET status = 'occupied', updated_at = NOW() WHERE id = $tableId");
+
+            $stmtSession = $db->prepare("INSERT INTO table_sessions (table_id, host_name, host_device_id, last_active_at, created_at, updated_at) VALUES (?, ?, ?, NOW(), NOW(), NOW())");
+            $stmtSession->bind_param('iss', $tableId, $guestName, $hostDeviceId);
+            $stmtSession->execute();
+            $sessionId = (int)$stmtSession->insert_id;
+
+            // Registrar nuevo anfitrión en table_session_participants
+            $stmtPart = $db->prepare("INSERT INTO table_session_participants (table_session_id, guest_name, role, status, created_at, updated_at) VALUES (?, ?, 'host', 'deciding', NOW(), NOW())");
+            $stmtPart->bind_param('is', $sessionId, $guestName);
+            $stmtPart->execute();
+
+            $db->commit();
+
+            echo json_encode([
+                'ok'             => true,
+                'table_id'       => $tableId,
+                'table_number'   => (int)$table['number'],
+                'session_id'     => $sessionId,
+                'host_device_id' => $hostDeviceId,
+                'role'           => 'host',
+                'guest_name'     => $guestName,
+                'status'         => 'occupied',
+            ]);
+            return;
+        } catch (Throwable $e) {
+            $db->rollback();
+            http_response_code(500);
+            echo json_encode(['ok' => false, 'message' => 'Error al iniciar sala de mesa.']);
+            return;
+        }
+    }
+
+    // 4. Si la mesa está ocupada -> Invitado (guest)
+    if ($table['status'] === 'occupied') {
+        $tableId = (int)$table['id'];
+        $stmtSess = $db->prepare("SELECT id, host_name, host_device_id FROM table_sessions WHERE table_id = ? ORDER BY id DESC LIMIT 1");
+        $stmtSess->bind_param('i', $tableId);
+        $stmtSess->execute();
+        $session = $stmtSess->get_result()->fetch_assoc();
+
+        if (!$session) {
+            // Fallback: si no había sesión registrada, crearla
+            $hostDeviceId = sprintf(
+                '%04x%04x-%04x-%04x-%04x-%04x%04x%04x',
+                mt_rand(0, 0xffff), mt_rand(0, 0xffff),
+                mt_rand(0, 0xffff),
+                mt_rand(0, 0x0fff) | 0x4000,
+                mt_rand(0, 0x3fff) | 0x8000,
+                mt_rand(0, 0xffff), mt_rand(0, 0xffff), mt_rand(0, 0xffff)
+            );
+            $stmtIns = $db->prepare("INSERT INTO table_sessions (table_id, host_name, host_device_id, last_active_at, created_at, updated_at) VALUES (?, ?, ?, NOW(), NOW(), NOW())");
+            $stmtIns->bind_param('iss', $tableId, $guestName, $hostDeviceId);
+            $stmtIns->execute();
+            $sessionId = (int)$stmtIns->insert_id;
+
+            echo json_encode([
+                'ok'             => true,
+                'table_id'       => $tableId,
+                'table_number'   => (int)$table['number'],
+                'session_id'     => $sessionId,
+                'host_device_id' => $hostDeviceId,
+                'role'           => 'host',
+                'guest_name'     => $guestName,
+                'status'         => 'occupied',
+            ]);
+            return;
+        }
+
+        // Registrar participante invitado en el Lobby
+        $stmtPart = $db->prepare("INSERT INTO table_session_participants (table_session_id, guest_name, role, status, created_at, updated_at) VALUES (?, ?, 'guest', 'deciding', NOW(), NOW())");
+        $stmtPart->bind_param('is', $session['id'], $guestName);
+        $stmtPart->execute();
+
+        // Invitado: NO devolver host_device_id por seguridad
+        echo json_encode([
+            'ok'           => true,
+            'table_id'     => $tableId,
+            'table_number' => (int)$table['number'],
+            'session_id'   => (int)$session['id'],
+            'role'         => 'guest',
+            'guest_name'   => $guestName,
+            'host_name'    => $session['host_name'] ?? 'el Anfitrión',
+            'status'       => 'occupied',
+        ]);
+        return;
+    }
+
+    http_response_code(400);
+    echo json_encode(['ok' => false, 'message' => 'Estado de mesa no válido.']);
+}
+
+function handleClientPingTable($db) {
+    $input = json_decode(file_get_contents('php://input'), true);
+    if (!is_array($input)) {
+        $input = $_POST;
+    }
+
+    $sessionId = isset($input['session_id']) ? (int)$input['session_id'] : 0;
+    $hostDeviceId = trim($input['host_device_id'] ?? '');
+
+    if ($sessionId <= 0) {
+        http_response_code(422);
+        echo json_encode(['ok' => false, 'message' => 'session_id es requerido.']);
+        return;
+    }
+
+    if (!empty($hostDeviceId)) {
+        $stmt = $db->prepare("SELECT id FROM table_sessions WHERE id = ? AND host_device_id = ? LIMIT 1");
+        $stmt->bind_param('is', $sessionId, $hostDeviceId);
+    } else {
+        $stmt = $db->prepare("SELECT id FROM table_sessions WHERE id = ? LIMIT 1");
+        $stmt->bind_param('i', $sessionId);
+    }
+    $stmt->execute();
+    $session = $stmt->get_result()->fetch_assoc();
+
+    if (!$session) {
+        http_response_code(404);
+        echo json_encode(['ok' => false, 'message' => 'Sesión de mesa no encontrada o ya expiró por inactividad.']);
+        return;
+    }
+
+    $stmtUp = $db->prepare("UPDATE table_sessions SET last_active_at = NOW(), updated_at = NOW() WHERE id = ?");
+    $stmtUp->bind_param('i', $sessionId);
+    $stmtUp->execute();
+
+    echo json_encode([
+        'ok'             => true,
+        'message'        => 'Heartbeat recibido exitosamente.',
+        'last_active_at' => date('c'),
+    ]);
+}
+
+function handleClientOverrideTable($db) {
+    $input = json_decode(file_get_contents('php://input'), true);
+    if (!is_array($input)) {
+        $input = $_POST;
+    }
+
+    $qrHash = trim($input['qr_hash'] ?? '');
+    $guestName = trim($input['guest_name'] ?? '');
+
+    if (empty($qrHash) || empty($guestName)) {
+        http_response_code(422);
+        echo json_encode(['ok' => false, 'message' => 'qr_hash y guest_name son requeridos.']);
+        return;
+    }
+
+    $stmt = $db->prepare("SELECT id, number, qr_hash, status FROM tables WHERE qr_hash = ? LIMIT 1");
+    $stmt->bind_param('s', $qrHash);
+    $stmt->execute();
+    $table = $stmt->get_result()->fetch_assoc();
+
+    if (!$table) {
+        http_response_code(404);
+        echo json_encode(['ok' => false, 'message' => 'Mesa no encontrada. Verifica el código QR escaneado.']);
+        return;
+    }
+
+    if ($table['status'] === 'locked') {
+        http_response_code(403);
+        echo json_encode(['ok' => false, 'message' => 'Hay un pedido en curso, pide al cajero que libere la mesa.']);
+        return;
+    }
+
+    $tableId = (int)$table['id'];
+    $hostDeviceId = sprintf(
+        '%04x%04x-%04x-%04x-%04x-%04x%04x%04x',
+        mt_rand(0, 0xffff), mt_rand(0, 0xffff),
+        mt_rand(0, 0xffff),
+        mt_rand(0, 0x0fff) | 0x4000,
+        mt_rand(0, 0x3fff) | 0x8000,
+        mt_rand(0, 0xffff), mt_rand(0, 0xffff), mt_rand(0, 0xffff)
+    );
+
+    $db->begin_transaction();
+    try {
+        $stmtSessions = $db->prepare("SELECT id FROM table_sessions WHERE table_id = ?");
+        $stmtSessions->bind_param('i', $tableId);
+        $stmtSessions->execute();
+        $sessions = $stmtSessions->get_result()->fetch_all(MYSQLI_ASSOC);
+        $sessionIds = array_column($sessions, 'id');
+
+        if (!empty($sessionIds)) {
+            $inClause = implode(',', array_map('intval', $sessionIds));
+            $db->query("DELETE FROM table_cart_items WHERE table_session_id IN ($inClause)");
+            $stmtDel = $db->prepare("DELETE FROM table_sessions WHERE table_id = ?");
+            $stmtDel->bind_param('i', $tableId);
+            $stmtDel->execute();
+        }
+
+        $db->query("UPDATE tables SET status = 'occupied', updated_at = NOW() WHERE id = $tableId");
+
+        $stmtSession = $db->prepare("INSERT INTO table_sessions (table_id, host_name, host_device_id, last_active_at, created_at, updated_at) VALUES (?, ?, ?, NOW(), NOW(), NOW())");
+        $stmtSession->bind_param('iss', $tableId, $guestName, $hostDeviceId);
+        $stmtSession->execute();
+        $sessionId = (int)$stmtSession->insert_id;
+
+        // Registrar nuevo anfitrión en el Lobby
+        $stmtPart = $db->prepare("INSERT INTO table_session_participants (table_session_id, guest_name, role, status, created_at, updated_at) VALUES (?, ?, 'host', 'deciding', NOW(), NOW())");
+        $stmtPart->bind_param('is', $sessionId, $guestName);
+        $stmtPart->execute();
+
+        $db->commit();
+
+        echo json_encode([
+            'ok'             => true,
+            'message'        => 'Mesa reiniciada exitosamente como nuevo Anfitrión.',
+            'table_id'       => $tableId,
+            'table_number'   => (int)$table['number'],
+            'session_id'     => $sessionId,
+            'host_device_id' => $hostDeviceId,
+            'role'           => 'host',
+            'guest_name'     => $guestName,
+            'status'         => 'occupied',
+        ]);
+    } catch (Throwable $e) {
+        $db->rollback();
+        http_response_code(500);
+        echo json_encode(['ok' => false, 'message' => 'Error al reiniciar la mesa: ' . $e->getMessage()]);
+    }
+}
+
+function handleClientLobbyTable($db, $sessionId) {
+    $sessionId = (int)$sessionId;
+
+    $stmtSess = $db->prepare("
+        SELECT ts.id, ts.table_id, ts.host_name, t.number AS table_number, t.status AS table_status
+        FROM table_sessions ts
+        LEFT JOIN tables t ON t.id = ts.table_id
+        WHERE ts.id = ?
+        LIMIT 1
+    ");
+    $stmtSess->bind_param('i', $sessionId);
+    $stmtSess->execute();
+    $session = $stmtSess->get_result()->fetch_assoc();
+
+    if (!$session) {
+        http_response_code(404);
+        echo json_encode(['ok' => false, 'message' => 'Sesión de mesa no encontrada o ya expiró por inactividad.']);
+        return;
+    }
+
+    $stmtParts = $db->prepare("
+        SELECT id, table_session_id, guest_name, role, status, created_at, updated_at
+        FROM table_session_participants
+        WHERE table_session_id = ?
+        ORDER BY id ASC
+    ");
+    $stmtParts->bind_param('i', $sessionId);
+    $stmtParts->execute();
+    $participants = $stmtParts->get_result()->fetch_all(MYSQLI_ASSOC);
+
+    $stmtCart = $db->prepare("
+        SELECT ci.id, ci.table_session_id, ci.guest_name, ci.product_id, ci.details, ci.price, ci.status, ci.created_at, ci.updated_at,
+               p.name AS product_name, p.slug AS product_slug, p.image_path, p.emoji
+        FROM table_cart_items ci
+        LEFT JOIN product_types p ON p.id = ci.product_id
+        WHERE ci.table_session_id = ?
+        ORDER BY ci.id ASC
+    ");
+    $stmtCart->bind_param('i', $sessionId);
+    $stmtCart->execute();
+    $cartItemsRaw = $stmtCart->get_result()->fetch_all(MYSQLI_ASSOC);
+
+    $cartItems = [];
+    $byGuest = [];
+    $totalPrice = 0.0;
+
+    foreach ($cartItemsRaw as $row) {
+        $row['id'] = (int)$row['id'];
+        $row['table_session_id'] = (int)$row['table_session_id'];
+        $row['product_id'] = (int)$row['product_id'];
+        $row['price'] = (float)$row['price'];
+        $row['details'] = !empty($row['details']) ? json_decode($row['details'], true) : [];
+        $row['product'] = [
+            'id' => $row['product_id'],
+            'name' => $row['product_name'] ?? 'Producto',
+            'slug' => $row['product_slug'] ?? '',
+            'image_path' => $row['image_path'] ?? '',
+            'emoji' => $row['emoji'] ?? '🌯',
+        ];
+
+        $guest = $row['guest_name'];
+        if (!isset($byGuest[$guest])) {
+            $byGuest[$guest] = [];
+        }
+        $byGuest[$guest][] = $row;
+        $totalPrice += $row['price'];
+        $cartItems[] = $row;
+    }
+
+    echo json_encode([
+        'ok'                 => true,
+        'table_id'           => (int)$session['table_id'],
+        'table_number'       => (int)($session['table_number'] ?? 0),
+        'table_status'       => $session['table_status'] ?? 'occupied',
+        'session_id'         => $sessionId,
+        'host_name'          => $session['host_name'] ?? 'Anfitrión',
+        'participants'       => $participants,
+        'participants_count' => count($participants),
+        'cart' => [
+            'items'       => $cartItems,
+            'by_guest'    => $byGuest,
+            'total_items' => count($cartItems),
+            'total_price' => $totalPrice,
+        ],
+    ]);
+}
+
+function handleClientCartDeleteItem($db, $itemId) {
+    $itemId = (int)$itemId;
+    $rawInput = file_get_contents('php://input');
+    $data = !empty($rawInput) ? json_decode($rawInput, true) : [];
+    if (!is_array($data)) $data = [];
+
+    $sessionId = $data['session_id'] ?? $_GET['session_id'] ?? null;
+    $guestName = $data['guest_name'] ?? $_GET['guest_name'] ?? null;
+
+    if (!$sessionId || !$guestName) {
+        http_response_code(422);
+        echo json_encode(['ok' => false, 'message' => 'session_id y guest_name son requeridos.']);
+        return;
+    }
+
+    $stmt = $db->prepare("SELECT id, table_session_id, guest_name FROM table_cart_items WHERE id = ? LIMIT 1");
+    $stmt->bind_param('i', $itemId);
+    $stmt->execute();
+    $item = $stmt->get_result()->fetch_assoc();
+
+    if (!$item) {
+        http_response_code(404);
+        echo json_encode(['ok' => false, 'message' => 'Producto no encontrado.']);
+        return;
+    }
+
+    if ((int)$item['table_session_id'] !== (int)$sessionId) {
+        http_response_code(400);
+        echo json_encode(['ok' => false, 'message' => 'El producto no pertenece a la sesión.']);
+        return;
+    }
+
+    if (trim($item['guest_name']) !== trim($guestName)) {
+        http_response_code(403);
+        echo json_encode(['ok' => false, 'message' => 'No puedes modificar los productos de otra persona']);
+        return;
+    }
+
+    $stmtDel = $db->prepare("DELETE FROM table_cart_items WHERE id = ?");
+    $stmtDel->bind_param('i', $itemId);
+    $stmtDel->execute();
+
+    echo json_encode(['ok' => true, 'message' => 'Producto eliminado del carrito de la mesa.']);
+}
+
+function handleClientCartUpdateItem($db, $itemId) {
+    $itemId = (int)$itemId;
+    $data = json_decode(file_get_contents('php://input'), true);
+    if (!is_array($data)) $data = [];
+
+    $sessionId = $data['session_id'] ?? null;
+    $guestName = $data['guest_name'] ?? null;
+    $details = $data['details'] ?? null;
+    $price = isset($data['price']) ? (float)$data['price'] : null;
+
+    if (!$sessionId || !$guestName || $details === null || $price === null) {
+        http_response_code(422);
+        echo json_encode(['ok' => false, 'message' => 'Datos incompletos para actualizar producto.']);
+        return;
+    }
+
+    $stmt = $db->prepare("SELECT id, table_session_id, guest_name FROM table_cart_items WHERE id = ? LIMIT 1");
+    $stmt->bind_param('i', $itemId);
+    $stmt->execute();
+    $item = $stmt->get_result()->fetch_assoc();
+
+    if (!$item) {
+        http_response_code(404);
+        echo json_encode(['ok' => false, 'message' => 'Producto no encontrado.']);
+        return;
+    }
+
+    if ((int)$item['table_session_id'] !== (int)$sessionId) {
+        http_response_code(400);
+        echo json_encode(['ok' => false, 'message' => 'El producto no pertenece a la sesión.']);
+        return;
+    }
+
+    if (trim($item['guest_name']) !== trim($guestName)) {
+        http_response_code(403);
+        echo json_encode(['ok' => false, 'message' => 'No puedes modificar los productos de otra persona']);
+        return;
+    }
+
+    $detailsJson = is_string($details) ? $details : json_encode($details);
+
+    $stmtUpd = $db->prepare("UPDATE table_cart_items SET details = ?, price = ?, updated_at = NOW() WHERE id = ?");
+    $stmtUpd->bind_param('sdi', $detailsJson, $price, $itemId);
+    $stmtUpd->execute();
+
+    echo json_encode(['ok' => true, 'message' => 'Producto actualizado en la mesa.']);
+}
+

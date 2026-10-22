@@ -150,6 +150,63 @@ CREATE TABLE IF NOT EXISTS `sessions` (
     INDEX `sessions_last_activity_index` (`last_activity`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- MÓDULO: SALAS MULTIJUGADOR (CARRITO COLABORATIVO)
+CREATE TABLE IF NOT EXISTS `tables` (
+    `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    `number` INT UNSIGNED NOT NULL,
+    `qr_hash` VARCHAR(64) NOT NULL,
+    `status` ENUM('free', 'occupied', 'locked') NOT NULL DEFAULT 'free',
+    `created_at` TIMESTAMP NULL DEFAULT NULL,
+    `updated_at` TIMESTAMP NULL DEFAULT NULL,
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `tables_number_unique` (`number`),
+    UNIQUE KEY `tables_qr_hash_unique` (`qr_hash`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `table_sessions` (
+    `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    `table_id` BIGINT UNSIGNED NOT NULL,
+    `host_device_id` VARCHAR(255) NOT NULL,
+    `last_active_at` TIMESTAMP NULL DEFAULT NULL,
+    `created_at` TIMESTAMP NULL DEFAULT NULL,
+    `updated_at` TIMESTAMP NULL DEFAULT NULL,
+    PRIMARY KEY (`id`),
+    KEY `table_sessions_table_id_foreign` (`table_id`),
+    CONSTRAINT `fk_table_sessions_table` FOREIGN KEY (`table_id`) REFERENCES `tables` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `table_session_participants` (
+    `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    `table_session_id` BIGINT UNSIGNED NOT NULL,
+    `guest_name` VARCHAR(255) NOT NULL,
+    `role` ENUM('host', 'guest') NOT NULL DEFAULT 'guest',
+    `status` ENUM('deciding', 'ready') NOT NULL DEFAULT 'deciding',
+    `created_at` TIMESTAMP NULL DEFAULT NULL,
+    `updated_at` TIMESTAMP NULL DEFAULT NULL,
+    PRIMARY KEY (`id`),
+    KEY `table_session_participants_table_session_id_foreign` (`table_session_id`),
+    CONSTRAINT `fk_table_session_participants_session` 
+        FOREIGN KEY (`table_session_id`) REFERENCES `table_sessions` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `table_cart_items` (
+    `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    `table_session_id` BIGINT UNSIGNED NOT NULL,
+    `guest_name` VARCHAR(255) NOT NULL,
+    `product_id` BIGINT UNSIGNED NOT NULL,
+    `details` JSON NOT NULL,
+    `price` DECIMAL(10, 2) NOT NULL DEFAULT 0.00,
+    `status` ENUM('building', 'ready') NOT NULL DEFAULT 'building',
+    `created_at` TIMESTAMP NULL DEFAULT NULL,
+    `updated_at` TIMESTAMP NULL DEFAULT NULL,
+    PRIMARY KEY (`id`),
+    KEY `table_cart_items_table_session_id_foreign` (`table_session_id`),
+    KEY `table_cart_items_product_id_foreign` (`product_id`),
+    CONSTRAINT `fk_table_cart_items_session` FOREIGN KEY (`table_session_id`) REFERENCES `table_sessions` (`id`) ON DELETE CASCADE,
+    CONSTRAINT `fk_table_cart_items_product` FOREIGN KEY (`product_id`) REFERENCES `product_types` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+
 -- ============================================================================
 -- 2. COLUMNAS NUEVAS — Por si la tabla ya existía sin estas columnas
 --    (cada ALTER usa IF NOT EXISTS o un procedimiento seguro)
@@ -333,4 +390,10 @@ SELECT 'product_types',    COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_
 UNION ALL
 SELECT 'settings',         COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'settings'
 UNION ALL
-SELECT 'users',            COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users';
+SELECT 'users',            COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users'
+UNION ALL
+SELECT 'tables',           COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'tables'
+UNION ALL
+SELECT 'table_sessions',   COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'table_sessions'
+UNION ALL
+SELECT 'table_cart_items', COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'table_cart_items';

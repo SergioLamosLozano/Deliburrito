@@ -47,31 +47,54 @@ export default function Print({ order }) {
 
         <div style={{ marginBottom: '15px' }}>
           <div style={{ fontWeight: '900', fontSize: '14px', borderBottom: '1px solid #000', marginBottom: '10px' }}>DETALLE DEL PEDIDO:</div>
-          {order.items.map((item, idx) => (
-            <div key={item.id} style={{ marginBottom: '15px', paddingBottom: '10px', borderBottom: '1px dashed #ccc' }}>
-              <div style={{ fontSize: '16px', fontWeight: '900', marginBottom: '5px', display: 'flex', justifyContent: 'space-between' }}>
-                <span>{item.product_type === 'burrito' ? '🌯 BURRITO' : '🍔 TORTIHAMBURGU'}</span>
-                <span>#{idx + 1}</span>
-              </div>
-              
-              <div style={{ paddingLeft: '5px' }}>
-                {item.options.map(opt => (
-                  <div key={opt.id} style={{ fontSize: '13px', marginBottom: '2px', display: 'flex', alignItems: 'flex-start' }}>
-                    <span style={{ marginRight: '5px' }}>-</span>
-                    <span style={{ fontWeight: opt.is_primary ? '900' : 'normal' }}>
-                      {opt.option.name} {opt.is_primary ? '(PRINCIPAL)' : ''}
-                    </span>
-                  </div>
-                ))}
-              </div>
+          {order.items.map((item, idx) => {
+            // Extraer el nombre del comensal individual si viene en notes "[Comensal: Nombre]"
+            let guestName = item.guest_name || null;
+            let cleanNotes = item.notes || '';
+            const match = cleanNotes.match(/\[Comensal:\s*([^\]]+)\]/i);
+            if (match) {
+              guestName = match[1].trim();
+              cleanNotes = cleanNotes.replace(match[0], '').trim();
+            }
 
-              {item.notes && (
-                <div style={{ marginTop: '5px', fontSize: '12px', fontStyle: 'italic', color: '#444' }}>
-                  Nota: {item.notes}
+            const productLabel = item.product_type === 'burrito' 
+              ? '🌯 Burrito' 
+              : (item.product_type === 'tortihamburguesa' ? '🍔 Tortihamburguesa' : item.product_type);
+            const variation = item.variation_name ? ` ${item.variation_name}` : '';
+            const dishTitle = `${productLabel}${variation}${guestName ? ` - [${guestName}]` : ''}`;
+
+            return (
+              <div key={item.id} style={{ marginBottom: '15px', paddingBottom: '10px', borderBottom: '1px dashed #ccc' }}>
+                <div style={{ fontSize: '16px', fontWeight: '900', marginBottom: '3px', display: 'flex', justifyContent: 'space-between' }}>
+                  <span>{dishTitle}</span>
+                  <span>#{idx + 1}</span>
                 </div>
-              )}
-            </div>
-          ))}
+
+                {guestName && (
+                  <div style={{ fontSize: '13px', fontWeight: 'bold', color: '#000', marginBottom: '6px', background: '#f3f4f6', padding: '2px 6px', display: 'inline-block', border: '1px solid #000' }}>
+                    👤 Comensal: <strong>{guestName}</strong>
+                  </div>
+                )}
+                
+                <div style={{ paddingLeft: '5px' }}>
+                  {item.options.map(opt => (
+                    <div key={opt.id} style={{ fontSize: '13px', marginBottom: '2px', display: 'flex', alignItems: 'flex-start' }}>
+                      <span style={{ marginRight: '5px' }}>-</span>
+                      <span style={{ fontWeight: opt.is_primary ? '900' : 'normal' }}>
+                        {opt.option.name} {opt.is_primary ? '(PRINCIPAL)' : ''}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+
+                {cleanNotes && (
+                  <div style={{ marginTop: '5px', fontSize: '12px', fontStyle: 'italic', color: '#444' }}>
+                    Nota: {cleanNotes}
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
 
         <div style={{ marginBottom: '20px', paddingTop: '10px', borderTop: '2px solid #000' }}>
