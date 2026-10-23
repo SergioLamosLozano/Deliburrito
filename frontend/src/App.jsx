@@ -212,51 +212,58 @@ export default function App(){
   };
 
   return (
-    <>
-      {view === 'lobby' && tableSession && (
-        <TableLobby
-          tableSession={tableSession}
-          onGoToBuilder={() => {
-            setEditingItem(null);
-            setView('builder');
-          }}
-          onEditItem={(item) => {
-            setEditingItem(item);
-            setView('builder');
-          }}
-          onSuccess={handleSuccess}
-          onLeaveTable={leaveTable}
-          showToast={showToast}
-        />
-      )}
-      {((view === 'builder') || (view === 'lobby' && !tableSession)) && (
-        <BurritoBuilder 
-          onCheckout={handleCheckout} 
-          initialCart={cart} 
-          showToast={showToast}
-          tableSession={tableSession}
-          onSuccess={handleSuccess}
-          onBackToLobby={() => {
-            setEditingItem(null);
-            setView('lobby');
-          }}
-          editingItem={editingItem}
-          onCancelEdit={() => setEditingItem(null)}
-        />
-      )}
-      {view === 'checkout' && (
-        <Checkout 
-          cartItems={cart} 
-          onBack={() => setView(tableSession ? 'lobby' : 'builder')} 
-          onBackToLobby={() => setView('lobby')}
-          onSuccess={handleSuccess} 
-          onRemoveItem={handleRemoveItem}
-          onDuplicateItem={handleDuplicateItem}
-          showToast={showToast}
-          tableSession={tableSession}
-        />
-      )}
-      {view === 'success' && <OrderSuccess orderId={orderId} onReset={handleReset} />}
+    <div className="min-h-screen flex flex-col">
+      <div className="flex-1 flex flex-col">
+        {view === 'lobby' && tableSession && (
+          <TableLobby
+            tableSession={tableSession}
+            onGoToBuilder={() => {
+              setEditingItem(null);
+              setView('builder');
+            }}
+            onEditItem={(item) => {
+              setEditingItem(item);
+              setView('builder');
+            }}
+            onSuccess={handleSuccess}
+            onLeaveTable={leaveTable}
+            showToast={showToast}
+          />
+        )}
+        {((view === 'builder') || (view === 'lobby' && !tableSession)) && (
+          <BurritoBuilder 
+            onCheckout={handleCheckout} 
+            initialCart={cart} 
+            showToast={showToast}
+            tableSession={tableSession}
+            onSuccess={handleSuccess}
+            onBackToLobby={() => {
+              setEditingItem(null);
+              setView('lobby');
+            }}
+            editingItem={editingItem}
+            onCancelEdit={() => setEditingItem(null)}
+          />
+        )}
+        {view === 'checkout' && (
+          <Checkout 
+            cartItems={cart} 
+            onBack={() => setView(tableSession ? 'lobby' : 'builder')} 
+            onBackToLobby={() => setView('lobby')}
+            onSuccess={handleSuccess} 
+            onRemoveItem={handleRemoveItem}
+            onDuplicateItem={handleDuplicateItem}
+            showToast={showToast}
+            tableSession={tableSession}
+          />
+        )}
+        {view === 'success' && <OrderSuccess orderId={orderId} onReset={handleReset} />}
+      </div>
+
+      {/* Footer Minimalista */}
+      <footer className="w-full py-4 mt-auto text-center text-xs font-medium text-gray-400 border-t border-gray-100">
+        © 2026 Deli Burrito. Desarrollado por Harold Santiago Vergara y Sergio Lamos Lozano.
+      </footer>
 
       {/* Modal Bloqueante de Bienvenida a la Mesa al escanear QR (?mesa=HASH) */}
       <TableWelcomeModal
@@ -346,6 +353,6 @@ export default function App(){
           </div>
         </div>
       )}
-    </>
+    </div>
   );
 }

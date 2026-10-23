@@ -17,72 +17,123 @@ export function useTableSession(showToast, onClearCart) {
   const [joinError, setJoinError] = useState(null);
   const [currentHostName, setCurrentHostName] = useState(null);
 
-  // 1. Verificar parámetro 'mesa' al montar y consultar estado inicial
+  // 1. Verificar parámetro 'mesa' al montar y validar sesión previa contra el servidor (Anti-Zombie)
   useEffect(() => {
-    try {
-      const searchParams = new URLSearchParams(window.location.search);
-      const mesaParam = searchParams.get('mesa');
+    let isMounted = true;
 
-      if (!mesaParam) {
-        // No hay parámetro de mesa en la URL: verificar si hay sesión previa válida
-        const stored = localStorage.getItem(STORAGE_KEY);
-        if (stored) {
+    const initSession = async () => {
+      try {
+        const searchParams = new URLSearchParams(window.location.search);
+        const mesaParam = searchParams.get('mesa');
+        const cleanHash = mesaParam ? mesaParam.trim() : null;
+        if (cleanHash) {
+          setQrHash(cleanHash);
+        }
+
+        // Obtener sesión previa guardada en localStorage
+        let storedSession = null;
+        const storedRaw = localStorage.getItem(STORAGE_KEY);
+        if (storedRaw) {
           try {
-            const parsed = JSON.parse(stored);
-            if (parsed && parsed.session_id) {
-              setTableSession(parsed);
-            }
+            storedSession = JSON.parse(storedRaw);
           } catch (e) {
             localStorage.removeItem(STORAGE_KEY);
           }
         }
-        return;
-      }
 
-      const cleanHash = mesaParam.trim();
-      setQrHash(cleanHash);
+        // Si existe sesión previa en localStorage, NO establecerla a ciegas:
+        // Validar primero con un fetch POST inmediato a /api/tables/ping para evitar "sesiones zombi"
+        if (storedSession && storedSession.session_id) {
+          // Si el usuario escaneó un nuevo QR (?mesa=...) diferente a la sesión guardada, descartar la previa
+          if (cleanHash && storedSession.qr_hash && storedSession.qr_hash !== cleanHash) {
+            localStorage.removeItem(STORAGE_KEY);
+            storedSession = null;
+          } else {
+            try {
+              const pingPayload = {
+                session_id: storedSession.session_id,
+              };
+              if (storedSession.role === 'host' && storedSession.host_device_id) {
+                pingPayload.host_device_id = storedSession.host_device_id;
+              }
 
-      // 2. Verificar si ya existe una sesión activa para este mismo QR
-      const stored = localStorage.getItem(STORAGE_KEY);
-      if (stored) {
-        try {
-          const parsed = JSON.parse(stored);
-          if (parsed && parsed.qr_hash === cleanHash && parsed.session_id) {
-            setTableSession(parsed);
-            setIsTableModalOpen(false);
-            return;
+              const pingRes = await fetch('/api/tables/ping', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Accept': 'application/json',
+                },
+                body: JSON.stringify(pingPayload),
+              });
+
+              if (!isMounted) return;
+
+              if (pingRes.status === 200) {
+                // 200 OK: Sesión válida en el servidor -> Establecer sesión y arrancar flujo normal
+                setTableSession(storedSession);
+                setIsTableModalOpen(false);
+                return;
+              } else if (pingRes.status === 404 || !pingRes.ok) {
+                // 404: Sesión expirada, liberada o inexistente en BD (Zombi)
+                console.warn('Sesión zombi detectada en localStorage (404). Limpiando...');
+                localStorage.removeItem(STORAGE_KEY);
+                setTableSession(null);
+                setQrHash(null);
+                setIsTableModalOpen(false);
+
+                // Limpiar la URL para remover ?mesa si existía y dejar la app en estado vacío original
+                if (window.history.replaceState) {
+                  const url = new URL(window.location.href);
+                  url.searchParams.delete('mesa');
+                  window.history.replaceState({}, '', url.pathname + url.search);
+                }
+                return;
+              }
+            } catch (err) {
+              console.warn('Error al verificar sesión con /api/tables/ping:', err);
+              localStorage.removeItem(STORAGE_KEY);
+              setTableSession(null);
+              return;
+            }
           }
-        } catch (e) {
-          localStorage.removeItem(STORAGE_KEY);
         }
+
+        // Si no hay sesión válida pero sí hay ?mesa en la URL, abrir modal de bienvenida
+        if (cleanHash) {
+          setIsTableModalOpen(true);
+
+          // Chequeo previo al servidor para detectar si la mesa está libre u ocupada por un anfitrión
+          fetch('/api/tables/join', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Accept': 'application/json',
+            },
+            body: JSON.stringify({ qr_hash: cleanHash }),
+          })
+            .then((res) => res.json().catch(() => null))
+            .then((data) => {
+              if (!isMounted) return;
+              if (data?.status === 'occupied' && data?.host_name) {
+                setCurrentHostName(data.host_name);
+              } else if (data?.status === 'free') {
+                setCurrentHostName(null);
+              }
+            })
+            .catch((err) => {
+              console.warn('Chequeo previo de estado de mesa:', err);
+            });
+        }
+      } catch (err) {
+        console.error('Error al inicializar sesión de mesa:', err);
       }
+    };
 
-      // Si existe ?mesa y no hay sesión activa coincidente, abrir modal
-      setIsTableModalOpen(true);
+    initSession();
 
-      // Chequeo previo al servidor para detectar si la mesa está libre u ocupada por un anfitrión
-      fetch('/api/tables/join', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-        },
-        body: JSON.stringify({ qr_hash: cleanHash }),
-      })
-        .then((res) => res.json().catch(() => null))
-        .then((data) => {
-          if (data?.status === 'occupied' && data?.host_name) {
-            setCurrentHostName(data.host_name);
-          } else if (data?.status === 'free') {
-            setCurrentHostName(null);
-          }
-        })
-        .catch((err) => {
-          console.warn('Chequeo previo de estado de mesa:', err);
-        });
-    } catch (err) {
-      console.error('Error al inicializar sesión de mesa:', err);
-    }
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   // 2. Salir de la mesa o reiniciar sesión cuando expira
