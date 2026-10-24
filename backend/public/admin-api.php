@@ -1379,8 +1379,9 @@ function handleForceReleaseTable($db, $id) {
 
         if (!empty($sessionIds)) {
             $inClause = implode(',', array_map('intval', $sessionIds));
-            // Eliminar items de carrito asociados
+            // Eliminar items de carrito y participantes asociados
             $db->query("DELETE FROM table_cart_items WHERE table_session_id IN ($inClause)");
+            $db->query("DELETE FROM table_session_participants WHERE table_session_id IN ($inClause)");
             // Eliminar sesiones
             $stmtDel = $db->prepare("DELETE FROM table_sessions WHERE table_id = ?");
             $stmtDel->bind_param('i', $id);

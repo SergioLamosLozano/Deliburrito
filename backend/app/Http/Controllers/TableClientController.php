@@ -9,6 +9,8 @@ use Illuminate\Support\Str;
 use App\Models\Table;
 use App\Models\TableSession;
 use App\Models\TableSessionParticipant;
+use App\Models\Order;
+use Carbon\Carbon;
 
 class TableClientController extends Controller
 {
@@ -317,6 +319,30 @@ class TableClientController extends Controller
             $totalPrice += (float)$item->price;
         }
 
+        // Obtener el último pedido enviado a cocina estrictamente en esta sesión activa.
+        // Si el pedido fue cancelado o rechazado, o pertenece a otra sesión anterior, NO debe mostrarse como activo en cocina.
+        $lastOrder = Order::where('table_session_id', $session->id)
+            ->whereNotIn('status', ['cancelado', 'rechazado'])
+            ->with(['items'])
+            ->latest('id')
+            ->first();
+
+        $lastOrderData = null;
+        if ($lastOrder) {
+            $rawCreatedAt = $lastOrder->getRawOriginal('created_at');
+            $bogotaDate = $rawCreatedAt ? Carbon::parse($rawCreatedAt, 'UTC')->setTimezone('America/Bogota') : $lastOrder->created_at;
+
+            $lastOrderData = [
+                'id'             => $lastOrder->id,
+                'status'         => $lastOrder->status, // 'pendiente', 'aceptado', 'cancelado'
+                'total'          => (float) $lastOrder->total,
+                'items_count'    => $lastOrder->items->count(),
+                'created_at'     => $bogotaDate?->toIso8601String(),
+                'time_formatted' => $bogotaDate?->format('h:i A'),
+                'time_ago'       => $bogotaDate?->diffForHumans(),
+            ];
+        }
+
         return response()->json([
             'ok'                 => true,
             'table_id'           => $table ? $table->id : $session->table_id,
@@ -326,6 +352,7 @@ class TableClientController extends Controller
             'host_name'          => $session->host_name,
             'participants'       => $session->participants,
             'participants_count' => $session->participants->count(),
+            'last_order'         => $lastOrderData,
             'cart' => [
                 'items'       => $cartItems,
                 'by_guest'    => $byGuest,

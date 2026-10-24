@@ -2616,7 +2616,13 @@
         const imgEl = document.getElementById('qrModalImage');
         const urlInput = document.getElementById('qrModalUrlInput');
 
-        const customerUrl = `${window.location.origin}/?mesa=${encodeURIComponent(table.qr_hash)}`;
+        // En desarrollo local (puerto 8000), apuntar al puerto 5173 de Vite para reflejar cambios en vivo.
+        // En producción (puerto estándar / dominio real), usar window.location.origin directamente.
+        const baseOrigin = (window.location.port === '8000')
+            ? `${window.location.protocol}//${window.location.hostname}:5173`
+            : window.location.origin;
+
+        const customerUrl = `${baseOrigin}/?mesa=${encodeURIComponent(table.qr_hash)}`;
         const qrApiUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&margin=10&data=${encodeURIComponent(customerUrl)}`;
 
         titleEl.textContent = `Mesa #${table.number}`;

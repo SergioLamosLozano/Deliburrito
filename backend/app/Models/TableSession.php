@@ -56,4 +56,20 @@ class TableSession extends Model
     {
         return $this->hasMany(TableSessionParticipant::class, 'table_session_id');
     }
+
+    /**
+     * Pedidos consolidados enviados a cocina desde esta sesión.
+     */
+    public function orders(): HasMany
+    {
+        return $this->hasMany(Order::class, 'table_session_id');
+    }
+
+    /**
+     * Último pedido enviado a cocina de esta sesión.
+     */
+    public function latestOrder(): \Illuminate\Database\Eloquent\Relations\HasOne
+    {
+        return $this->hasOne(Order::class, 'table_session_id')->latestOfMany();
+    }
 }

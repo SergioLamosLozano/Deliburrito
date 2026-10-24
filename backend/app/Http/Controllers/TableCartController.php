@@ -8,6 +8,8 @@ use Illuminate\Support\Facades\Validator;
 use App\Models\TableSession;
 use App\Models\TableCartItem;
 use App\Models\ProductType;
+use App\Models\Order;
+use Carbon\Carbon;
 
 class TableCartController extends Controller
 {
@@ -153,6 +155,38 @@ class TableCartController extends Controller
         // Agrupación para saber quién pidió qué
         $byGuest = $items->groupBy('guest_name');
 
+        // Buscar última orden enviada
+        $table = $session->table;
+        $lastOrder = Order::where(function ($q) use ($session, $table) {
+            $q->where('table_session_id', $session->id);
+            if ($table) {
+                $q->orWhere(function ($sub) use ($table, $session) {
+                    $sub->where('table_number', (string)$table->number)
+                        ->where('delivery_type', 'local')
+                        ->where('created_at', '>=', $session->created_at);
+                });
+            }
+        })
+        ->with(['items'])
+        ->latest()
+        ->first();
+
+        $lastOrderData = null;
+        if ($lastOrder) {
+            $rawCreatedAt = $lastOrder->getRawOriginal('created_at');
+            $bogotaDate = $rawCreatedAt ? Carbon::parse($rawCreatedAt, 'UTC')->setTimezone('America/Bogota') : $lastOrder->created_at;
+
+            $lastOrderData = [
+                'id'             => $lastOrder->id,
+                'status'         => $lastOrder->status,
+                'total'          => (float) $lastOrder->total,
+                'items_count'    => $lastOrder->items->count(),
+                'created_at'     => $bogotaDate?->toIso8601String(),
+                'time_formatted' => $bogotaDate?->format('h:i A'),
+                'time_ago'       => $bogotaDate?->diffForHumans(),
+            ];
+        }
+
         return response()->json([
             'ok'          => true,
             'session_id'  => (int) $session->id,
@@ -165,6 +199,7 @@ class TableCartController extends Controller
             'by_guest'    => $byGuest,
             'total_items' => $items->count(),
             'total_price' => (float) $items->sum('price'),
+            'last_order'  => $lastOrderData,
         ], 200);
     }
 

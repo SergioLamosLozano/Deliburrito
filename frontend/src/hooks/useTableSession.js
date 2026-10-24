@@ -75,25 +75,31 @@ export function useTableSession(showToast, onClearCart) {
                 return;
               } else if (pingRes.status === 404 || !pingRes.ok) {
                 // 404: Sesión expirada, liberada o inexistente en BD (Zombi)
-                console.warn('Sesión zombi detectada en localStorage (404). Limpiando...');
+                console.warn('Sesión previa liberada o inexistente en BD (404). Limpiando localStorage...');
                 localStorage.removeItem(STORAGE_KEY);
+                storedSession = null;
                 setTableSession(null);
-                setQrHash(null);
-                setIsTableModalOpen(false);
 
-                // Limpiar la URL para remover ?mesa si existía y dejar la app en estado vacío original
-                if (window.history.replaceState) {
-                  const url = new URL(window.location.href);
-                  url.searchParams.delete('mesa');
-                  window.history.replaceState({}, '', url.pathname + url.search);
+                // Si NO hay parámetro ?mesa en la URL, limpiar estado y URL
+                if (!cleanHash) {
+                  setQrHash(null);
+                  setIsTableModalOpen(false);
+                  if (window.history.replaceState) {
+                    const url = new URL(window.location.href);
+                    url.searchParams.delete('mesa');
+                    window.history.replaceState({}, '', url.pathname + url.search);
+                  }
+                  return;
                 }
-                return;
+                // Si SÍ hay cleanHash en la URL, la mesa fue liberada y el cliente tiene el enlace/QR:
+                // Dejamos que continúe abajo para abrir el modal de unirse a la mesa libre.
               }
             } catch (err) {
               console.warn('Error al verificar sesión con /api/tables/ping:', err);
               localStorage.removeItem(STORAGE_KEY);
+              storedSession = null;
               setTableSession(null);
-              return;
+              if (!cleanHash) return;
             }
           }
         }

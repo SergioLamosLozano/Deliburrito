@@ -119,6 +119,7 @@ export default function TableCartModal({
           total_items: data.total_items || 0,
           total_price: data.total_price || 0,
           table: data.table || {},
+          last_order: data.last_order || null,
         });
         setLastSync(new Date());
         if (onItemCountChange) {
@@ -441,50 +442,86 @@ export default function TableCartModal({
             </div>
           </div>
 
+          {/* RETROALIMENTACIÓN PERSISTENTE SI EL PEDIDO YA FUE A COCINA Y EL CARRITO ESTÁ VACÍO */}
+          {cartData.items.length === 0 && cartData.last_order && (
+            <div className="mb-3.5 p-3.5 bg-gradient-to-r from-emerald-50 to-teal-50 border-2 border-emerald-300 rounded-2xl flex items-center gap-3 text-emerald-950 shadow-sm animate-in fade-in">
+              <IoCheckmarkCircle className="w-6 h-6 text-emerald-600 shrink-0" />
+              <div className="text-left flex-1 min-w-0">
+                <span className="text-xs font-black uppercase tracking-wider block text-emerald-900 truncate">
+                  Pedido #{cartData.last_order.id} en cocina
+                </span>
+                <span className="text-[11px] text-emerald-700 font-medium block">
+                  {cartData.last_order.status === 'aceptado'
+                    ? '¡Tu comanda ya está en preparación en cocina!'
+                    : `Comanda enviada (${cartData.last_order.time_formatted || 'hace un momento'}).`}
+                </span>
+              </div>
+            </div>
+          )}
+
           {/* BOTÓN POR ROL (ANFITRIÓN VS INVITADO) */}
           {isHost ? (
             <div>
-              <button
-                type="button"
-                onClick={handleSendToKitchen}
-                disabled={isSending || cartData.items.length === 0}
-                className={`w-full py-4 rounded-2xl font-black text-base uppercase tracking-wider flex items-center justify-center gap-2 shadow-xl transition-all active:scale-[0.98] ${
-                  isSending || cartData.items.length === 0
-                    ? 'bg-gray-200 text-gray-400 cursor-not-allowed shadow-none'
-                    : 'bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 text-white shadow-green-600/30'
-                }`}
-              >
-                {isSending ? (
-                  <>
-                    <svg className="animate-spin h-5 w-5 text-white mr-2" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
-                    </svg>
-                    Enviando a cocina...
-                  </>
-                ) : (
-                  <>
-                    <IoRestaurant className="w-5 h-5" />
-                    Enviar Pedido a Cocina
-                  </>
-                )}
-              </button>
+              {cartData.items.length === 0 && cartData.last_order ? (
+                <div className="w-full py-3.5 px-4 rounded-2xl font-black text-xs sm:text-sm uppercase tracking-wider flex items-center justify-center gap-2 bg-emerald-100 text-emerald-900 border-2 border-emerald-300 text-center">
+                  <IoCheckmarkCircle className="w-5 h-5 text-emerald-600 shrink-0" />
+                  <span>Comanda enviada a cocina con éxito</span>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={handleSendToKitchen}
+                  disabled={isSending || cartData.items.length === 0}
+                  className={`w-full py-4 rounded-2xl font-black text-base uppercase tracking-wider flex items-center justify-center gap-2 shadow-xl transition-all active:scale-[0.98] ${
+                    isSending || cartData.items.length === 0
+                      ? 'bg-gray-200 text-gray-400 cursor-not-allowed shadow-none'
+                      : 'bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 text-white shadow-green-600/30'
+                  }`}
+                >
+                  {isSending ? (
+                    <>
+                      <svg className="animate-spin h-5 w-5 text-white mr-2" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+                      </svg>
+                      Enviando a cocina...
+                    </>
+                  ) : (
+                    <>
+                      <IoRestaurant className="w-5 h-5" />
+                      {cartData.last_order && cartData.items.length > 0
+                        ? `Enviar Siguiente Ronda (${cartData.items.length})`
+                        : 'Enviar Pedido a Cocina'
+                      }
+                    </>
+                  )}
+                </button>
+              )}
               <p className="text-[11px] text-gray-400 text-center font-bold mt-2">
                 👑 Como Anfitrión, tú envías la comanda unificada directamente al personal.
               </p>
             </div>
           ) : (
             <div>
-              <button
-                type="button"
-                disabled
-                className="w-full py-4 bg-gray-100 border-2 border-gray-200 text-gray-400 rounded-2xl font-black text-sm uppercase tracking-wider cursor-not-allowed flex items-center justify-center gap-2 shadow-inner"
-              >
-                <IoTimeOutline className="w-5 h-5 text-gray-400 animate-pulse" />
-                Esperando que el Anfitrión envíe...
-              </button>
+              {cartData.items.length === 0 && cartData.last_order ? (
+                <div className="w-full py-3.5 px-4 bg-emerald-50 border-2 border-emerald-300 rounded-2xl text-center flex items-center justify-center gap-2 text-emerald-900 shadow-sm">
+                  <IoCheckmarkCircle className="w-5 h-5 text-emerald-600 shrink-0" />
+                  <span className="text-xs font-black uppercase tracking-wider">
+                    ¡El Anfitrión ya envió el pedido #{cartData.last_order.id} a cocina!
+                  </span>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  disabled
+                  className="w-full py-4 bg-gray-100 border-2 border-gray-200 text-gray-400 rounded-2xl font-black text-sm uppercase tracking-wider cursor-not-allowed flex items-center justify-center gap-2 shadow-inner"
+                >
+                  <IoTimeOutline className="w-5 h-5 text-gray-400 animate-pulse" />
+                  Esperando que el Anfitrión envíe...
+                </button>
+              )}
               <p className="text-[11px] text-gray-400 text-center font-bold mt-2">
-                👥 Tu burrito ya está en la sala. El anfitrión enviará el pedido cuando todos estén listos.
+                👥 Tu comida se gestiona a través de la comanda de la sala.
               </p>
             </div>
           )}

@@ -49,6 +49,7 @@ class OrderController extends Controller
                     'customer_phone' => $payload['customer_phone'],
                     'customer_address' => $payload['customer_address'] ?? null,
                     'table_number' => $payload['table_number'] ?? null,
+                    'table_session_id' => !empty($payload['session_id']) ? $payload['session_id'] : null,
                     'delivery_type' => $payload['delivery_type'],
                     'observations' => $payload['observations'] ?? null,
                     'delivery_cost' => ($payload['delivery_type'] === 'domicilio') ? $deliveryCostDefault : 0.0,

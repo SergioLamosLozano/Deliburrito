@@ -14,7 +14,8 @@ import {
   IoTrashOutline,
   IoCreateOutline,
   IoWarningOutline,
-  IoClose
+  IoClose,
+  IoEyeOutline
 } from 'react-icons/io5';
 
 // Helper para leer token CSRF
@@ -47,6 +48,7 @@ export default function TableLobby({
   const [isLeaving, setIsLeaving] = useState(false);
   const [showLeaveModal, setShowLeaveModal] = useState(false);
   const [itemToDelete, setItemToDelete] = useState(null);
+  const [selectedItemDetail, setSelectedItemDetail] = useState(null);
 
   const sessionId = tableSession?.session_id;
   const isHost = tableSession?.role === 'host';
@@ -110,6 +112,10 @@ export default function TableLobby({
       });
 
       if (!res.ok) {
+        if (res.status === 404 && typeof onLeaveTable === 'function') {
+          onLeaveTable(true);
+          return;
+        }
         throw new Error('Error al consultar el lobby');
       }
 
@@ -123,7 +129,7 @@ export default function TableLobby({
     } finally {
       if (isInitial) setLoading(false);
     }
-  }, [sessionId]);
+  }, [sessionId, onLeaveTable]);
 
   // 2. Short-polling cada 3 segundos
   useEffect(() => {
@@ -279,6 +285,7 @@ export default function TableLobby({
   const byGuest = cart.by_guest || {};
   const tableNum = lobbyData?.table_number || tableSession?.table_number || tableSession?.table_id;
   const hostName = lobbyData?.host_name || tableSession?.guest_name || 'Anfitrión';
+  const lastOrder = lobbyData?.last_order || null;
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-50 via-white to-amber-50/30 flex flex-col items-center justify-between p-4 sm:p-6 pb-28">
@@ -366,9 +373,20 @@ export default function TableLobby({
               <span className="text-xs sm:text-base font-black text-gray-900 tracking-tighter leading-none uppercase">
                 Mesa {tableNum}
               </span>
-              <span className="text-[9px] sm:text-[11px] font-bold text-red-600 mt-1 bg-red-50 px-2 py-0.5 rounded-full border border-red-200">
-                {cart.total_items} {cart.total_items === 1 ? 'ítem' : 'ítems'}
-              </span>
+              {cart.total_items > 0 ? (
+                <span className="text-[9px] sm:text-[11px] font-bold text-red-600 mt-1 bg-red-50 px-2 py-0.5 rounded-full border border-red-200">
+                  {cart.total_items} {cart.total_items === 1 ? 'ítem' : 'ítems'}
+                </span>
+              ) : lastOrder ? (
+                <span className="text-[9px] sm:text-[10px] font-black text-emerald-800 mt-1 bg-emerald-100 px-2 py-0.5 rounded-full border border-emerald-300 flex items-center gap-1 shadow-xs animate-pulse">
+                  <span>👨‍🍳</span>
+                  <span>En Cocina</span>
+                </span>
+              ) : (
+                <span className="text-[9px] sm:text-[11px] font-bold text-red-600 mt-1 bg-red-50 px-2 py-0.5 rounded-full border border-red-200">
+                  0 ítems
+                </span>
+              )}
             </div>
 
             {/* Sutil halo decorativo */}
@@ -470,8 +488,57 @@ export default function TableLobby({
           )}
         </div>
 
+        {/* ── CARD PERSISTENTE DE RETROALIMENTACIÓN: PEDIDO EN COCINA ── */}
+        {lastOrder && (
+          <div className="w-full max-w-md mt-4 bg-gradient-to-br from-emerald-50 via-teal-50 to-green-50 border-2 border-emerald-400/80 rounded-3xl p-4 sm:p-5 shadow-xl shadow-emerald-500/10 relative overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-300">
+            {/* Decoración de fondo */}
+            <div className="absolute -right-2 -bottom-2 text-emerald-200/50 text-7xl font-black pointer-events-none select-none">
+              👨‍🍳
+            </div>
+
+            <div className="flex items-start gap-3.5 relative z-10">
+              <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-gradient-to-tr from-emerald-600 to-teal-500 text-white flex items-center justify-center text-xl sm:text-2xl shrink-0 shadow-md shadow-emerald-600/30">
+                {lastOrder.status === 'aceptado' ? '🔥' : '👨‍🍳'}
+              </div>
+
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h3 className="text-xs sm:text-sm font-black uppercase tracking-wider text-emerald-950">
+                    Pedido #{lastOrder.id} en Cocina
+                  </h3>
+                  <span className={`text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider flex items-center gap-1 shadow-xs ${
+                    lastOrder.status === 'aceptado'
+                      ? 'bg-emerald-600 text-white'
+                      : 'bg-amber-400 text-amber-950 animate-pulse'
+                  }`}>
+                    <span className={`w-1.5 h-1.5 rounded-full ${lastOrder.status === 'aceptado' ? 'bg-white' : 'bg-amber-950'}`}></span>
+                    {lastOrder.status === 'aceptado' ? 'En Preparación' : 'Recibido en Cocina'}
+                  </span>
+                </div>
+
+                <p className="text-xs text-emerald-900/90 font-medium mt-1 leading-snug">
+                  {lastOrder.status === 'aceptado'
+                    ? '¡Tu comanda ya fue aceptada! Los cocineros están preparando y dorando los burritos en la plancha.'
+                    : 'La comanda ya fue enviada y recibida con éxito por el personal de cocina.'}
+                </p>
+
+                <div className="flex items-center gap-2.5 mt-2.5 text-[11px] font-bold text-emerald-800 pt-2 border-t border-emerald-200/60 flex-wrap">
+                  <span className="flex items-center gap-1">
+                    <IoTimeOutline className="w-3.5 h-3.5 text-emerald-600" />
+                    {lastOrder.time_formatted || lastOrder.time_ago || 'Hace un momento'}
+                  </span>
+                  <span>•</span>
+                  <span>{lastOrder.items_count} {lastOrder.items_count === 1 ? 'producto' : 'productos'}</span>
+                  <span>•</span>
+                  <span className="font-black text-emerald-950">${Number(lastOrder.total).toLocaleString('es-CO')}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* ── BOTONES DE ACCIÓN GIGANTES ─────────────────────────────────── */}
-        <div className="w-full max-w-md space-y-3.5 mt-4 sm:mt-6 px-2">
+        <div className="w-full max-w-md space-y-3.5 mt-4 sm:mt-5 px-2">
           
           {/* BOTÓN GIGANTE: ARMAR MI COMIDA */}
           <button
@@ -484,45 +551,71 @@ export default function TableLobby({
             <IoArrowForward className="w-6 h-6 sm:w-7 sm:h-7" />
           </button>
 
-          {/* BOTÓN: ENVIAR PEDIDO A COCINA (CONDICIONAL POR ROL) */}
+          {/* BOTÓN: ENVIAR PEDIDO A COCINA (CONDICIONAL POR ROL Y ESTADO) */}
           {isHost ? (
-            <button
-              type="button"
-              disabled={isSending || cart.total_items === 0}
-              onClick={handleSendToKitchen}
-              className={`w-full py-4 px-6 rounded-2xl font-black text-base sm:text-lg uppercase tracking-wider flex items-center justify-center gap-2 shadow-xl transition-all ${
-                cart.total_items === 0 || isSending
-                  ? 'bg-gray-100 text-gray-400 border-2 border-gray-200 cursor-not-allowed shadow-none'
-                  : 'bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white shadow-emerald-500/30 active:scale-[0.98]'
-              }`}
-            >
-              {isSending ? (
-                <>
-                  <svg className="animate-spin -ml-1 mr-2 h-5 w-5 text-white" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
-                  </svg>
-                  Enviando Pedido a Cocina...
-                </>
-              ) : (
-                <>
-                  <span>👨‍🍳</span>
-                  <span>Enviar Pedido a Cocina ({cart.total_items})</span>
-                </>
-              )}
-            </button>
-          ) : (
-            <div className="w-full py-3.5 px-4 bg-amber-50 border-2 border-amber-200 rounded-2xl text-center flex items-center justify-center gap-2.5 text-amber-900 shadow-sm">
-              <IoLockClosed className="w-5 h-5 text-amber-600 shrink-0" />
-              <div className="text-left">
-                <p className="text-xs font-black uppercase tracking-wider leading-none">
-                  Esperando que {hostName} envíe a cocina...
-                </p>
-                <p className="text-[11px] text-amber-700/80 font-medium mt-0.5">
-                  Solo el Anfitrión puede despachar el pedido consolidado.
-                </p>
+            cart.total_items === 0 && lastOrder ? (
+              <div className="w-full py-4 px-6 rounded-2xl font-black text-xs sm:text-sm uppercase tracking-wider flex items-center justify-center gap-2.5 bg-emerald-100/90 text-emerald-900 border-2 border-emerald-300 shadow-sm text-center">
+                <IoCheckmarkCircle className="w-5 h-5 text-emerald-600 shrink-0" />
+                <span>Pedido #{lastOrder.id} enviado a cocina con éxito</span>
               </div>
-            </div>
+            ) : (
+              <button
+                type="button"
+                disabled={isSending || cart.total_items === 0}
+                onClick={handleSendToKitchen}
+                className={`w-full py-4 px-6 rounded-2xl font-black text-base sm:text-lg uppercase tracking-wider flex items-center justify-center gap-2 shadow-xl transition-all ${
+                  cart.total_items === 0 || isSending
+                    ? 'bg-gray-100 text-gray-400 border-2 border-gray-200 cursor-not-allowed shadow-none'
+                    : 'bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white shadow-emerald-500/30 active:scale-[0.98]'
+                }`}
+              >
+                {isSending ? (
+                  <>
+                    <svg className="animate-spin -ml-1 mr-2 h-5 w-5 text-white" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+                    </svg>
+                    Enviando Pedido a Cocina...
+                  </>
+                ) : (
+                  <>
+                    <span>👨‍🍳</span>
+                    <span>
+                      {lastOrder && cart.total_items > 0
+                        ? `Enviar Siguiente Ronda (${cart.total_items})`
+                        : `Enviar Pedido a Cocina (${cart.total_items})`
+                      }
+                    </span>
+                  </>
+                )}
+              </button>
+            )
+          ) : (
+            cart.total_items === 0 && lastOrder ? (
+              <div className="w-full py-3.5 px-4 bg-emerald-50 border-2 border-emerald-300 rounded-2xl text-center flex items-center justify-center gap-2.5 text-emerald-900 shadow-sm">
+                <IoCheckmarkCircle className="w-5 h-5 text-emerald-600 shrink-0" />
+                <div className="text-left">
+                  <p className="text-xs font-black uppercase tracking-wider leading-none">
+                    ¡{hostName} ya envió el pedido #{lastOrder.id} a cocina!
+                  </p>
+                  <p className="text-[11px] text-emerald-700/90 font-medium mt-0.5">
+                    Tu comida ya está registrada. Podés armar más comida si deseás otra ronda.
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <div className="w-full py-3.5 px-4 bg-amber-50 border-2 border-amber-200 rounded-2xl text-center flex items-center justify-center gap-2.5 text-amber-900 shadow-sm">
+                <IoLockClosed className="w-5 h-5 text-amber-600 shrink-0" />
+                <div className="text-left">
+                  <p className="text-xs font-black uppercase tracking-wider leading-none">
+                    Esperando que {hostName} envíe a cocina...
+                  </p>
+                  <p className="text-[11px] text-amber-700/80 font-medium mt-0.5">
+                    Solo el Anfitrión puede despachar el pedido consolidado.
+                  </p>
+                </div>
+              </div>
+            )
           )}
         </div>
 
@@ -558,13 +651,25 @@ export default function TableLobby({
                     {items.map((it, idx) => {
                       const isMine = it.guest_name === myName || guest === myName;
                       return (
-                        <li key={it.id || idx} className="flex items-center justify-between py-2 sm:py-2.5 px-3 bg-white rounded-2xl border border-gray-100 text-xs gap-2 shadow-xs">
-                          <div className="flex-1 min-w-0 pr-1">
-                            <span className="font-bold text-gray-800 block truncate text-xs sm:text-sm">
-                              {it.details?.display_name || it.product?.name || 'Burrito'}
-                            </span>
+                        <li 
+                          key={it.id || idx} 
+                          className="flex items-center justify-between py-2 sm:py-2.5 px-3 bg-white hover:bg-amber-50/70 rounded-2xl border border-gray-100 hover:border-amber-300 text-xs gap-2 shadow-xs transition-all"
+                        >
+                          <div 
+                            onClick={() => setSelectedItemDetail(it)}
+                            className="flex-1 min-w-0 pr-1 cursor-pointer group"
+                            title="Toca para ver el detalle de los ingredientes"
+                          >
+                            <div className="flex items-center gap-1.5">
+                              <span className="font-bold text-gray-800 group-hover:text-amber-900 block truncate text-xs sm:text-sm transition-colors">
+                                {it.details?.display_name || it.product?.name || 'Burrito'}
+                              </span>
+                              <span className="text-[10px] text-amber-600 font-bold opacity-70 group-hover:opacity-100 transition-opacity flex items-center gap-0.5">
+                                <IoEyeOutline className="w-3 h-3" /> Ver
+                              </span>
+                            </div>
                             {it.details?.selection_summary && (
-                              <span className="text-[10px] sm:text-[11px] text-gray-400 block truncate leading-tight">
+                              <span className="text-[10px] sm:text-[11px] text-gray-400 group-hover:text-gray-600 block truncate leading-tight mt-0.5">
                                 {it.details.selection_summary}
                               </span>
                             )}
@@ -783,6 +888,150 @@ export default function TableLobby({
                   </>
                 )}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Detalle Rápido del Pedido (Inspección rápida antes de enviar) */}
+      {selectedItemDetail && (
+        <div 
+          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-200"
+          onClick={() => setSelectedItemDetail(null)}
+        >
+          <div 
+            className="bg-white rounded-3xl max-w-md w-full overflow-hidden shadow-2xl border border-amber-100 flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-200"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Encabezado */}
+            <div className="relative p-5 bg-gradient-to-r from-amber-500 via-orange-500 to-red-500 text-white flex items-start justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center text-2xl shadow-inner border border-white/30">
+                  🌯
+                </div>
+                <div>
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-amber-100 block">
+                    Detalle del Pedido
+                  </span>
+                  <h3 className="text-lg font-black leading-tight text-white">
+                    {selectedItemDetail.details?.display_name || selectedItemDetail.product?.name || 'Burrito'}
+                  </h3>
+                  <div className="flex items-center gap-2 mt-1">
+                    <span className="text-xs bg-white/25 px-2 py-0.5 rounded-full font-bold">
+                      👤 {selectedItemDetail.guest_name || 'Comensal'} {selectedItemDetail.guest_name === myName && '(Tú)'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setSelectedItemDetail(null)}
+                className="p-1.5 rounded-full bg-black/20 hover:bg-black/30 text-white transition-colors"
+                aria-label="Cerrar modal"
+              >
+                <IoClose className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Contenido / Ingredientes */}
+            <div className="p-5 overflow-y-auto space-y-4">
+              {/* Precio Total */}
+              <div className="flex items-center justify-between p-3.5 bg-amber-50/80 rounded-2xl border border-amber-200/60">
+                <span className="text-xs font-bold text-amber-900 uppercase tracking-wide">
+                  Precio Total
+                </span>
+                <span className="text-lg font-black text-amber-950">
+                  ${Number(selectedItemDetail.price).toLocaleString('es-CO')}
+                </span>
+              </div>
+
+              {/* Lista de ingredientes / selección */}
+              <div>
+                <h4 className="text-xs font-black text-gray-500 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                  <IoSparkles className="w-3.5 h-3.5 text-amber-500" />
+                  Ingredientes & Opciones Seleccionadas
+                </h4>
+                
+                {selectedItemDetail.details?.selection_summary ? (
+                  <div className="flex flex-wrap gap-1.5">
+                    {selectedItemDetail.details.selection_summary
+                      .split(/,\s*/)
+                      .filter(Boolean)
+                      .map((ingredient, i) => (
+                        <span 
+                          key={i}
+                          className="px-2.5 py-1 bg-gray-100 hover:bg-gray-200 text-gray-800 text-xs font-semibold rounded-xl border border-gray-200 transition-colors"
+                        >
+                          {ingredient}
+                        </span>
+                      ))}
+                  </div>
+                ) : (
+                  <p className="text-xs text-gray-400 italic">
+                    Sin ingredientes o detalles especificados.
+                  </p>
+                )}
+              </div>
+
+              {/* Notas especiales si hay */}
+              {selectedItemDetail.details?.notes && (
+                <div className="p-3 bg-gray-50 rounded-2xl border border-gray-200">
+                  <h4 className="text-xs font-bold text-gray-600 mb-1">Notas especiales:</h4>
+                  <p className="text-xs text-gray-700 italic">"{selectedItemDetail.details.notes}"</p>
+                </div>
+              )}
+            </div>
+
+            {/* Footer con acciones */}
+            <div className="p-4 bg-gray-50 border-t border-gray-100 flex items-center gap-2">
+              {selectedItemDetail.guest_name === myName ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const it = selectedItemDetail;
+                      setSelectedItemDetail(null);
+                      if (typeof handleDeleteItemClick === 'function') {
+                        handleDeleteItemClick(it);
+                      }
+                    }}
+                    className="p-3 bg-red-50 hover:bg-red-100 text-red-600 rounded-2xl border border-red-200 transition-all font-bold text-xs flex items-center justify-center gap-1.5"
+                    title="Eliminar este burrito"
+                  >
+                    <IoTrashOutline className="w-4 h-4" />
+                    <span>Eliminar</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const it = selectedItemDetail;
+                      setSelectedItemDetail(null);
+                      if (typeof onEditItem === 'function') {
+                        onEditItem(it);
+                      }
+                    }}
+                    className="flex-1 py-3 px-4 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-black text-sm rounded-2xl shadow-md shadow-amber-200 transition-all active:scale-95 flex items-center justify-center gap-2"
+                  >
+                    <IoCreateOutline className="w-4 h-4" />
+                    <span>Editar mi Burrito</span>
+                  </button>
+                </>
+              ) : (
+                <div className="w-full flex items-center justify-between gap-3">
+                  <span className="text-[11px] text-gray-500 font-medium">
+                    🔒 Solo <strong className="text-gray-700">{selectedItemDetail.guest_name}</strong> puede modificarlo.
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedItemDetail(null)}
+                    className="py-2.5 px-4 bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold text-xs rounded-xl transition-all"
+                  >
+                    Cerrar
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </div>
